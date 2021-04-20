@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "apis-ipif-solr"
+version = "0.1.0"
+description = ""
+authors = ["Richard Hadden <richard.hadden@oeaw.ac.at>"]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+pysolaar = {git = "git@gitlab.com:richardhadden/pysolaar.git", rev = "main"}
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
