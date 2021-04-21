@@ -52,10 +52,7 @@ class FactoidIndex(PySolaar):
                 role=True,
                 statementText=True,
             ),
-            Person=ChildDocument(
-                id=True,
-                uris=True,
-            ),
+            Person=ChildDocument(id=True, uris=True,),
             Statements=ChildDocument(
                 id=True,
                 statementText=True,
@@ -75,16 +72,12 @@ class FactoidIndex(PySolaar):
             modifiedBy=SingleValue,
             modifiedWhen=SingleValue,
             Person=(
-                ChildDocument(
-                    id=TransformKey("@id"),
-                )
+                ChildDocument(id=TransformKey("@id"),)
                 & SingleValue
                 & TransformKey("person-ref")
             ),
             Statements=(
-                ChildDocument(
-                    id=TransformKey("@id"),
-                )
+                ChildDocument(id=TransformKey("@id"),)
                 & TransformKey("statement-refs")
                 & TransformValues(
                     lambda v: {"description": STATEMENT_REF_DESCRIPTION, **v}
@@ -171,23 +164,13 @@ class PersonIndex(PySolaar):
             modifiedBy=True,
             modifiedWhen=True,
             uris=True,
-            S=ChildDocument(
-                id=True,
-                uris=True,
-                label=True,
-            ),
-            ST=ChildDocument(
-                id=True,
-                uris=True,
-                label=True,
-            ),
+            S=ChildDocument(id=True, uris=True, label=True,),
+            ST=ChildDocument(id=True, uris=True, label=True,),
             F=JsonChildDocument(
                 id=True,
                 uris=True,
                 label=True,
-                S=ChildDocument(
-                    id=True,
-                ),
+                S=ChildDocument(id=True,),
                 Person=ChildDocument(id=True),
                 ST=ChildDocument(id=True),
             ),
@@ -202,18 +185,12 @@ class PersonIndex(PySolaar):
             uris=True,
             F=JsonToDict(
                 id=TransformKey("@id"),
-                Person=ChildDocument(
-                    id=TransformKey("@id"),
-                )
+                Person=ChildDocument(id=TransformKey("@id"),)
                 & SingleValue
                 & TransformKey("person-ref"),
-                ST=ChildDocument(
-                    id=TransformKey("@id"),
-                )
+                ST=ChildDocument(id=TransformKey("@id"),)
                 & TransformKey("statement-refs"),
-                S=ChildDocument(
-                    id=TransformKey("@id"),
-                )
+                S=ChildDocument(id=TransformKey("@id"),)
                 & SingleValue
                 & TransformKey("source-ref"),
             )
@@ -276,10 +253,7 @@ class StatementIndex(PySolaar):
             role=True,
             date=True,
             places=True,
-            relatesToPersons=ChildDocument(
-                id=True,
-                uris=True,
-            ),
+            relatesToPersons=ChildDocument(id=True, uris=True,),
             memberOf=True,
             statementText=True,
             createdBy=True,
@@ -287,25 +261,13 @@ class StatementIndex(PySolaar):
             modifiedBy=True,
             modifiedWhen=True,
             P=ChildDocument(
-                id=True,
-                uris=True,
-                label=True,
-                createdBy=True,
-                modifiedBy=True,
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
             ),
             F=ChildDocument(
-                id=True,
-                uris=True,
-                label=True,
-                createdBy=True,
-                modifiedBy=True,
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
             ),
             S=ChildDocument(
-                id=True,
-                uris=True,
-                label=True,
-                createdBy=True,
-                modifiedBy=True,
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
             ),
         )
         return_document_fields = DocumentFields(
@@ -321,10 +283,7 @@ class StatementIndex(PySolaar):
             memberOf__label=SingleValue,
             memberOf__uri=True,
             statementText=SingleValue,
-            relatesToPersons=ChildDocument(
-                uris=True,
-                label=SingleValue,
-            ),
+            relatesToPersons=ChildDocument(uris=True, label=SingleValue,),
             createdBy=SingleValue,
             createdWhen=SingleValue,
             modifiedBy=SingleValue,
@@ -421,23 +380,6 @@ class StatementIndex(PySolaar):
 
                 item["statementText"] = str(relation)
 
-                """
-                if (
-                    not skip_factoid_refs
-                ):  # TODO: these are not generating factoid refs!!!
-                    references = Reference.objects.filter(object_id=instance.pk)
-                    item["factoid-refs"] = [
-                        factoidRef
-                        for factoidRef in [
-                            FactoidRefGenerator(
-                                instance, source=getattr(ref, "bibs_url", None)
-                            ).to_representation(instance, skip_fields="person-ref")
-                            for ref in [*references, None]
-                        ]
-                        if item["@id"]
-                        in {s["@id"] for s in factoidRef["statement-refs"]}
-                    ]
-                """
                 ver = Version.objects.get_for_object(relation).order_by(
                     "revision__date_created"
                 )
@@ -495,23 +437,6 @@ class StatementIndex(PySolaar):
                     if A_or_B == "A"
                     else PersonIndex.items(relation.related_personA)
                 )
-                """
-                item["relatesToPerson"] = (
-                    {
-                        "uri": [
-                            str(uri) for uri in relation.related_personB.uri_set.all()
-                        ],
-                        "label": f"{relation.related_personB.name}, {relation.related_personB.first_name}",
-                    }
-                    if A_or_B == "A"
-                    else {
-                        "uri": [
-                            str(uri) for uri in relation.related_personA.uri_set.all()
-                        ],
-                        "label": f"{relation.related_personA.name}, {relation.related_personA.first_name}",
-                    }
-                )
-                """
 
                 item["statementType"][
                     "uri"
@@ -544,21 +469,6 @@ class StatementIndex(PySolaar):
                 item["modifiedBy"] = str(ver.last().revision.user)
                 item["modifiedWhen"] = ver.last().revision.date_created
 
-                """
-                if not skip_factoid_refs:
-                    references = Reference.objects.filter(object_id=instance.pk)
-                    item["factoid-refs"] = [
-                        factoidRef
-                        for factoidRef in [
-                            FactoidRefGenerator(
-                                instance, source=getattr(ref, "bibs_url", None)
-                            ).to_representation(instance, skip_fields="person-ref")
-                            for ref in [*references, None]
-                        ]
-                        if item["@id"]
-                        in {s["@id"] for s in factoidRef["statement-refs"]}
-                    ]
-                """
                 r_list.append(item)
 
         # Iterate over _meta.fields and then get the value
@@ -574,18 +484,14 @@ class StatementIndex(PySolaar):
 
             """
             field_name = re.search(r"([A-Za-z]+)\'>", str(f.__class__)).group(1)
-            if (
-                field_name
-                in [
-                    "CharField",
-                    "DateField",
-                    "DateTimeField",
-                    "IntegerField",
-                    "FloatField",
-                    "ForeignKey",
-                ]
-                and f.name.lower() not in {"source", "status"}
-            ):
+            if field_name in [
+                "CharField",
+                "DateField",
+                "DateTimeField",
+                "IntegerField",
+                "FloatField",
+                "ForeignKey",
+            ] and f.name.lower() not in {"source", "status"}:
                 if _source and f.name in list(
                     references.values_list("attribute", flat=True)
                 ):
@@ -625,21 +531,6 @@ class StatementIndex(PySolaar):
                     item["role"]["label"] = "death"
                     item["date"]["sortdate"] = f.value_from_object(instance)
 
-                """
-                if not skip_factoid_refs:
-                    references = Reference.objects.filter(object_id=instance.pk)
-                    item["factoid-refs"] = [
-                        factoidRef
-                        for factoidRef in [
-                            FactoidRefGenerator(
-                                instance, source=getattr(ref, "bibs_url", None)
-                            ).to_representation(instance)
-                            for ref in [*references, None]
-                        ]
-                        if item["@id"]
-                        in {s["@id"] for s in factoidRef["statement-refs"]}
-                    ]
-                """
                 if item["role"]["label"]:
                     r_list.append(item)
 
@@ -670,21 +561,7 @@ class StatementIndex(PySolaar):
 
                     item["role"] = {"uri": "NONE", "label": field_set.name}
                     item["date"] = {"sortdate": None, "label": ""}
-                    """
-                    if not skip_factoid_refs:
-                        references = Reference.objects.filter(object_id=instance.pk)
-                        item["factoid-refs"] = [
-                            factoidRef
-                            for factoidRef in [
-                                FactoidRefGenerator(
-                                    instance, source=getattr(ref, "bibs_url", None)
-                                ).to_representation(instance, skip_fields="person-ref")
-                                for ref in [*references, None]
-                            ]
-                            if item["@id"]
-                            in {s["@id"] for s in factoidRef["statement-refs"]}
-                        ]
-                    """
+
                     r_list.append(item)
         for item in r_list:
             # print(item)
@@ -715,29 +592,16 @@ class SourceIndex(PySolaar):
                 statementText=True,
             ),
             F=SplattedChildDocument(
-                createdBy=True,
-                modifiedBy=True,
-                modfiedWhen=True,
-                createdWhen=True,
+                createdBy=True, modifiedBy=True, modfiedWhen=True, createdWhen=True,
             ),
             Factoids=ChildDocument(
                 id=True,
-                Person=SplattedChildDocument(
-                    id=True,
-                ),
-                Source=SplattedChildDocument(
-                    id=True,
-                ),
+                Person=SplattedChildDocument(id=True,),
+                Source=SplattedChildDocument(id=True,),
                 Statements=SplattedChildDocument(id=True),
             ),
-            P=SplattedChildDocument(
-                uris=True,
-                createdBy=True,
-                modifiedBy=True,
-            ),
-            Persons=ChildDocument(
-                id=True,
-            ),
+            P=SplattedChildDocument(uris=True, createdBy=True, modifiedBy=True,),
+            Persons=ChildDocument(id=True,),
             Statements=ChildDocument(
                 id=True,
                 statementText=True,
@@ -757,9 +621,7 @@ class SourceIndex(PySolaar):
             createdWhen=SingleValue,
             modfiedBy=SingleValue,
             modifiedWhen=SingleValue,
-            Factoids=ChildDocument(
-                Person=TransformKey("person-ref") & SingleValue,
-            )
+            Factoids=ChildDocument(Person=TransformKey("person-ref") & SingleValue,)
             & SingleValue
             & TransformKey("factoid-refs"),
         )

@@ -62,22 +62,6 @@ optional = false
 python-versions = ">=3.6, <3.7"
 
 [[package]]
-name = "django"
-version = "2.2.20"
-description = "A high-level Python Web framework that encourages rapid development and clean, pragmatic design."
-category = "main"
-optional = false
-python-versions = ">=3.5"
-
-[package.dependencies]
-pytz = "*"
-sqlparse = ">=0.2.2"
-
-[package.extras]
-argon2 = ["argon2-cffi (>=16.1.0)"]
-bcrypt = ["bcrypt"]
-
-[[package]]
 name = "idna"
 version = "2.10"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -107,7 +91,7 @@ version = "0.8.0"
 description = ""
 category = "main"
 optional = false
-python-versions = "^3.9"
+python-versions = ">=3.6,<4"
 develop = false
 
 [package.dependencies]
@@ -118,7 +102,7 @@ solrq = "^1.1.1"
 type = "git"
 url = "git@gitlab.com:richardhadden/pysolaar.git"
 reference = "main"
-resolved_reference = "292735a593a6db665ffb13088acb5e3ab6bc9d37"
+resolved_reference = "85c4035cbea15bcdf801299500747be9753d0588"
 
 [[package]]
 name = "pysolr"
@@ -133,14 +117,6 @@ requests = ">=2.9.1"
 
 [package.extras]
 solrcloud = ["kazoo (>=2.5.0)"]
-
-[[package]]
-name = "pytz"
-version = "2021.1"
-description = "World timezone definitions, modern and historical"
-category = "main"
-optional = false
-python-versions = "*"
 
 [[package]]
 name = "regex"
@@ -175,14 +151,6 @@ description = "Python Solr query utility"
 category = "main"
 optional = false
 python-versions = "*"
-
-[[package]]
-name = "sqlparse"
-version = "0.4.1"
-description = "A non-validating SQL parser."
-category = "main"
-optional = false
-python-versions = ">=3.5"
 
 [[package]]
 name = "toml"
@@ -223,8 +191,8 @@ brotli = ["brotlipy (>=0.6.0)"]
 
 [metadata]
 lock-version = "1.1"
-python-versions = "^3.6"
-content-hash = "fc146c5e313c25ca5a53ba7f700c2b4dfbf68818687640c62703dc5b0868f4a0"
+python-versions = ">=3.6,<4"
+content-hash = "e7be231b27dfffd338ae347878d65ef16b44d5a86472ec8503ed2059ad64dda7"
 
 [metadata.files]
 appdirs = [
@@ -250,10 +218,6 @@ dataclasses = [
     {file = "dataclasses-0.8-py3-none-any.whl", hash = "sha256:0201d89fa866f68c8ebd9d08ee6ff50c0b255f8ec63a71c16fda7af82bb887bf"},
     {file = "dataclasses-0.8.tar.gz", hash = "sha256:8479067f342acf957dc82ec415d355ab5edb7e7646b90dc6e2fd1d96ad084c97"},
 ]
-django = [
-    {file = "Django-2.2.20-py3-none-any.whl", hash = "sha256:2484f115891ab1a0e9ae153602a641fbc15d7894c036d79fb78662c0965d7954"},
-    {file = "Django-2.2.20.tar.gz", hash = "sha256:2569f9dc5f8e458a5e988b03d6b7a02bda59b006d6782f4ea0fd590ed7336a64"},
-]
 idna = [
     {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
     {file = "idna-2.10.tar.gz", hash = "sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6"},
@@ -269,10 +233,6 @@ pathspec = [
 pysolaar = []
 pysolr = [
     {file = "pysolr-3.9.0.tar.gz", hash = "sha256:6ef05feb87c614894243eddc62e9b0a6134a889c159ae868655cf6cd749545e6"},
-]
-pytz = [
-    {file = "pytz-2021.1-py2.py3-none-any.whl", hash = "sha256:eb10ce3e7736052ed3623d49975ce333bcd712c7bb19a58b9e2089d4057d0798"},
-    {file = "pytz-2021.1.tar.gz", hash = "sha256:83a4a90894bf38e243cf052c8b58f381bfe9a7a483f6a9cab140bc7f702ac4da"},
 ]
 regex = [
     {file = "regex-2021.4.4-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:619d71c59a78b84d7f18891fe914446d07edd48dc8328c8e149cbe0929b4e000"},
@@ -324,10 +284,6 @@ requests = [
 solrq = [
     {file = "solrq-1.1.1-py2.py3-none-any.whl", hash = "sha256:eec72c6025b829a4004876a52a0e42cd8d6e2046860ff8cd65130d9361d37dda"},
     {file = "solrq-1.1.1.tar.gz", hash = "sha256:1fd1fa77fbfb09d7a0a4752bc23c53acf734fc4a52b0718eb19171319e64bc30"},
-]
-sqlparse = [
-    {file = "sqlparse-0.4.1-py3-none-any.whl", hash = "sha256:017cde379adbd6a1f15a61873f43e8274179378e95ef3fede90b5aa64d304ed0"},
-    {file = "sqlparse-0.4.1.tar.gz", hash = "sha256:0f91fd2e829c44362cbcfab3e9ae12e22badaa8a29ad5ff599f9ec109f0454e8"},
 ]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},

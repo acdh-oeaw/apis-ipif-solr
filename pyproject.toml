@@ -5,9 +5,8 @@ description = ""
 authors = ["Richard Hadden <richard.hadden@oeaw.ac.at>"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = ">=3.6,<4"
 pysolaar = {git = "git@gitlab.com:richardhadden/pysolaar.git", rev = "main"}
-Django = "^2.2"
 
 
 [tool.poetry.dev-dependencies]
