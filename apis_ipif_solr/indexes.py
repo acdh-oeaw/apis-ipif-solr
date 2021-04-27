@@ -164,12 +164,26 @@ class PersonIndex(PySolaar):
             modifiedBy=True,
             modifiedWhen=True,
             uris=True,
-            S=ChildDocument(id=True, uris=True, label=True,),
-            ST=ChildDocument(id=True, uris=True, label=True,),
-            F=JsonChildDocument(
+            S=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+            ),
+            ST=ChildDocument(  # TODO: NEED ALL THE FIELDS HERE IN ORDER TO SEARCH!!!
                 id=True,
-                uris=True,
-                label=True,
+                createdBy=True,
+                modifiedBy=True,
+                statementType=True,
+                name=True,
+                role=True,
+                date=True,
+                places=True,
+                relatesToPersons=SplattedChildDocument(id=True, uris=True,),
+                memberOf=True,
+                statementText=True,
+            ),
+            F=ChildDocument(
+                id=True,
+                createdBy=True,
+                modifiedBy=True,
                 S=ChildDocument(id=True,),
                 Person=ChildDocument(id=True),
                 ST=ChildDocument(id=True),
@@ -183,14 +197,13 @@ class PersonIndex(PySolaar):
             modifiedBy=SingleValue,
             modifiedWhen=SingleValue,
             uris=True,
-            F=JsonToDict(
+            F=ChildDocument(
                 id=TransformKey("@id"),
-                Person=ChildDocument(id=TransformKey("@id"),)
+                Person=JsonToDict(id=TransformKey("@id"),)
                 & SingleValue
                 & TransformKey("person-ref"),
-                ST=ChildDocument(id=TransformKey("@id"),)
-                & TransformKey("statement-refs"),
-                S=ChildDocument(id=TransformKey("@id"),)
+                ST=JsonToDict(id=TransformKey("@id"),) & TransformKey("statement-refs"),
+                S=JsonToDict(id=TransformKey("@id"),)
                 & SingleValue
                 & TransformKey("source-ref"),
             )

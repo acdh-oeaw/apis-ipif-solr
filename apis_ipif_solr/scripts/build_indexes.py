@@ -1,3 +1,7 @@
-from pysolaar import PySolaar
+from apis_ipif_solr.indexes import PySolaar, PersonIndex
 
-# PySolaar.update()
+
+def run():
+    print("running!")
+    PySolaar.update()
+
