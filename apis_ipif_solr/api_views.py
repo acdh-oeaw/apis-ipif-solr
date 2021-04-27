@@ -1,3 +1,4 @@
+from functools import reduce
 import json
 
 from pysolaar import Q
@@ -57,27 +58,33 @@ class PersonListView(APIView):
             "place",
         ]
 
-        statement_filter_q_object = None
+        statement_filter_q_list = []
         for statement_param_key in STATEMENT_PARAM_KEYS:
             statement_param_value = params.get(statement_param_key)
             if statement_param_value:
-                print(">> ", statement_param_key, statement_param_value)
                 if statement_param_key == "to":
-                    param_dict = {"to__lte": statement_param_value}
+                    statement_filter_q_list.append(
+                        Q(date__sortdate__lte=statement_param_value)
+                    )
                 elif statement_param_key == "from":
-                    param_dict = {"from__gte": statement_param_value}
-
+                    statement_filter_q_list.append(
+                        Q(date__sortdate__gte=statement_param_value)
+                    )
+                elif statement_param_key in ("statementText", "name",):
+                    q = Q(**{statement_param_key: statement_param_value})
+                    statement_filter_q_list.append(q)
                 else:
-                    param_dict = {statement_param_key: statement_param_value}
+                    q = Q(**{f"{statement_param_key}__uri": statement_param_value}) | Q(
+                        **{f"{statement_param_key}__label": statement_param_value}
+                    )
+                    statement_filter_q_list.append(q)
 
-                if not statement_filter_q_object:
-                    statement_filter_q_object = Q(**param_dict)
-                else:
-                    statement_filter_q_object &= Q(**param_dict)
-
-        if statement_filter_q_object:
-            print("filtering")
-            person_result.filter_by_distinct_child(
+        if statement_filter_q_list:
+            statement_filter_q_object = statement_filter_q_list[0]
+            for q in statement_filter_q_list[1:]:
+                statement_filter_q_object &= q
+            print("filtering", statement_filter_q_object)
+            person_result = person_result.filter_by_distinct_child(
                 statement_filter_q_object, field_name="ST"
             )
 

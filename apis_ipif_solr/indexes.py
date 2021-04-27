@@ -256,336 +256,6 @@ class PersonIndex(PySolaar):
         return PersonIndex.Document(**doc)
 
 
-class StatementIndex(PySolaar):
-    class Meta:
-        store_document_fields = DocumentFields(
-            id=True,
-            uris=True,
-            statementType=True,
-            name=True,
-            role=True,
-            date=True,
-            places=True,
-            relatesToPersons=ChildDocument(id=True, uris=True,),
-            memberOf=True,
-            statementText=True,
-            createdBy=True,
-            createdWhen=True,
-            modifiedBy=True,
-            modifiedWhen=True,
-            P=ChildDocument(
-                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
-            ),
-            F=ChildDocument(
-                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
-            ),
-            S=ChildDocument(
-                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
-            ),
-        )
-        return_document_fields = DocumentFields(
-            id=TransformKey("@id"),
-            uris=True,
-            statementType__label=SingleValue,
-            statementType__uri=True,
-            name=True,
-            role__label=SingleValue,
-            role__uri=True,
-            date__sortdate=True,
-            date__label=True,
-            memberOf__label=SingleValue,
-            memberOf__uri=True,
-            statementText=SingleValue,
-            relatesToPersons=ChildDocument(uris=True, label=SingleValue,),
-            createdBy=SingleValue,
-            createdWhen=SingleValue,
-            modifiedBy=SingleValue,
-            modifiedWhen=SingleValue,
-        )
-
-    def build_document_set(self):
-        """The Statement document set identifiers are all combinations of
-        Person x [Person->Sources, None]"""
-        for person in Person.objects.all():
-            references = Reference.objects.filter(object_id=person.pk)
-            for source in [*references, None]:
-                print(
-                    f"Building StatementIndex for [Person:{person.pk}, Source:{source}]"
-                )
-                yield from self.build_document((person, source))
-
-    # build_document_set = None
-
-    def build_document(self, identifier):
-
-        instance, _source = identifier
-
-        r_list = []
-
-        # Get relation types for a person, exclude PersonPerson as more complex (tackle below)
-        relation_types = ContentType.objects.filter(
-            app_label="apis_relations", model__icontains="person"
-        ).exclude(model="PersonPerson")
-
-        if _source:
-            # If we have a source ID provided, look up that up in references
-            references = Reference.objects.filter(bibs_url=_source)
-
-        # Go through each relation type ('PersonInstitute', 'PersonPlace', 'PersonEvent'...)
-        # and get the specific relations of each type for the person instance
-        for relation_type in relation_types:
-
-            # If we provide a source to limit by, add that as a filter
-            if _source:
-                relation_queryset = relation_type.model_class().objects.filter(
-                    related_person=instance,
-                    pk__in=list(references.values_list("object_id", flat=True)),
-                )
-            # Otherwise get them all...
-            else:
-                relation_queryset = relation_type.model_class().objects.filter(
-                    related_person=instance
-                )
-
-            for relation in relation_queryset:
-
-                relation_type_name = relation_type.model_class().__name__
-
-                item = {"@id": f"{instance.pk}_{relation_type_name}_{relation.pk}"}
-
-                item["name"] = ""
-                item["statementType"] = {"uri": "", "label": ""}
-                item["memberOf"] = {"uri": "", "label": ""}
-                item["place"] = {"uri": "", "label": ""}
-                # item["relatesToPerson"] = {"uri": "", "label": ""}
-                item["role"] = {"url": "NONE", "label": ""}
-                item["date"] = {"sortdate": None, "label": ""}
-
-                item["statementType"][
-                    "url"
-                ] = "statement_type_url"  # relation.relation_type.pk
-                item["statementType"][
-                    "label"
-                ] = "statement_type_label"  # relation.relation_type.label
-
-                item["role"]["label"] = (
-                    getattr(relation.relation_type, "reverse_name", None)
-                    or relation.relation_type.name
-                )
-                item["date"]["sortdate"] = relation.start_date or relation.end_date
-                item["date"]["label"] = (
-                    f"{relation.start_date}-{relation.end_date}"
-                    if relation.start_date and relation.end_date
-                    else str(relation.start_date)
-                )
-
-                if relation_type_name == "PersonInstitution":
-                    item["memberOf"]["uri"] = [
-                        str(url) for url in relation.related_institution.uri_set.all()
-                    ] + [relation.related_institution.get_absolute_url()]
-                    item["memberOf"]["label"] = relation.related_institution.name
-
-                if relation_type_name == "PersonPlace":
-                    item["place"]["uri"] = [
-                        str(url) for url in relation.related_place.uri_set.all()
-                    ] + [relation.related_place.get_absolute_url()]
-                    item["place"]["label"] = relation.related_place.name
-
-                item["statementText"] = str(relation)
-
-                ver = Version.objects.get_for_object(relation).order_by(
-                    "revision__date_created"
-                )
-                if ver:
-                    item["createdBy"] = str(ver.first().revision.user)
-                    item["createdWhen"] = ver.first().revision.date_created
-                    item["modifiedBy"] = str(ver.last().revision.user)
-                    item["modifiedWhen"] = ver.last().revision.date_created
-
-                r_list.append(item)
-
-        # Here we do same as above, for PersonPerson relations.
-        # But obviously more complex as persons can be A or B in a relation
-
-        # Build specific relation sets, and assign whether instance is A or B in relation
-        for A_or_B, relation_set in [
-            *[
-                ("A", rel)
-                for rel in [
-                    relation_type_set.personperson_set.filter(
-                        related_personA=instance
-                    ).all()
-                    for relation_type_set in instance.personB_relationtype_set.all()
-                ]
-            ],
-            *[
-                ("B", rel)
-                for rel in [
-                    relation_type_set.personperson_set.filter(
-                        related_personB=instance
-                    ).all()
-                    for relation_type_set in instance.personA_relationtype_set.all()
-                ]
-            ],
-        ]:
-
-            # Iterate all the relations in each set
-            for relation in relation_set:
-
-                item = {
-                    "@id": f"{instance.pk}__PersonPerson_{relation.relation_type.pk}__{relation.pk}"
-                }
-
-                item["name"] = ""
-                item["statementType"] = {"uri": "", "label": ""}
-                item["memberOf"] = {"uri": "", "label": ""}
-                item["place"] = {"uri": "", "label": ""}
-                item["relatesToPerson"] = {"uri": "", "label": ""}
-                item["role"] = {"uri": "NONE", "label": ""}
-                item["date"] = {"sortdate": None, "label": ""}
-
-                # Unpack related person, depending on role A or B
-                item["relatesToPersons"] = (
-                    PersonIndex.items(relation.related_personB)
-                    if A_or_B == "A"
-                    else PersonIndex.items(relation.related_personA)
-                )
-
-                item["statementType"][
-                    "uri"
-                ] = "statement_type_uri"  # relation.relation_type.pk
-                item["statementType"][
-                    "label"
-                ] = "statement_type_label"  # relation.relation_type.label
-
-                item["role"]["label"] = (
-                    relation.relation_type.name
-                    if A_or_B == "A"
-                    else relation.relation_type.name_reverse
-                )
-                item["date"]["sortdate"] = relation.start_date or relation.end_date
-                item["date"]["label"] = (
-                    f"{relation.start_date}-{relation.end_date}"
-                    if relation.start_date and relation.end_date
-                    else relation.start_date_written
-                    if relation.start_date_written
-                    else str(relation.start_date)
-                )
-
-                item["statement-text"] = str(relation)
-
-                ver = Version.objects.get_for_object(relation).order_by(
-                    "revision__date_created"
-                )
-                item["createdBy"] = str(ver.first().revision.user)
-                item["createdWhen"] = ver.first().revision.date_created
-                item["modifiedBy"] = str(ver.last().revision.user)
-                item["modifiedWhen"] = ver.last().revision.date_created
-
-                r_list.append(item)
-
-        # Iterate over _meta.fields and then get the value
-        # calling .value_to_string on object for each _meta.field
-        for f in instance._meta.fields:
-            """
-            From this loop it seems we take:
-            - name -- apis_metainfo.TempEntityClass.name
-            - date-of-birth -- apis_metainfo.TempEntityClass.start_date
-            - date-of-death -- apis_metainfo.TempEntityClass.end_date
-            - first-name -- apis_entities.Person.first_name
-            - gender -- apis_entities.Person.gender
-
-            """
-            field_name = re.search(r"([A-Za-z]+)\'>", str(f.__class__)).group(1)
-            if field_name in [
-                "CharField",
-                "DateField",
-                "DateTimeField",
-                "IntegerField",
-                "FloatField",
-                "ForeignKey",
-            ] and f.name.lower() not in {"source", "status"}:
-                if _source and f.name in list(
-                    references.values_list("attribute", flat=True)
-                ):
-                    item = {"@id": f"{instance.pk}_attrb_{f.name}"}
-
-                else:
-                    item = {"@id": f"{instance.pk}_attrb_{f.name}"}
-
-                item["statementText"] = ""
-
-                item["name"] = ""
-                item["statementType"] = {"uri": "", "label": ""}
-                item["memberOf"] = {"uri": "", "label": ""}
-                item["place"] = {"uri": "", "label": ""}
-                # item["relatesToPerson"] = {"uri": "", "label": ""}
-                item["role"] = {"uri": "NONE", "label": ""}
-                item["date"] = {"sortdate": None, "label": ""}
-
-                if f.name in {"name", "first_name"}:
-                    item["statementType"]["uri"] = "statement_type_uri"
-                    item["role"]["label"] = f"has {f.name.replace('_', ' ')}"
-                    item["name"] = f.value_to_string(instance)
-
-                if f.name == "gender":
-                    item["statementType"]["uri"] = "statement_type_uri"
-                    item["statementType"]["label"] = f.value_to_string(instance)
-                    item["role"]["label"] = "gender"
-                    item["statementText"] = f"has gender {f.value_to_string(instance)}"
-
-                if f.name == "start_date":
-                    item["statementType"]["uri"] = "statement_type_uri"
-                    item["role"]["label"] = "birth"
-                    item["date"]["sortdate"] = f.value_from_object(instance)
-
-                if f.name == "end_date":
-                    item["statementType"]["uri"] = "statement_type_uri"
-                    item["role"]["label"] = "death"
-                    item["date"]["sortdate"] = f.value_from_object(instance)
-
-                if item["role"]["label"]:
-                    r_list.append(item)
-
-        # Iterate many to many-to-many fields
-        for field_set in instance._meta.many_to_many:
-            if str(field_set.related_model.__module__).endswith(
-                "apis_vocabularies.models"
-            ) and not field_set.name.endswith("set"):
-
-                # If we limit by source, skip the field
-                if _source:
-                    if field_set.name not in list(
-                        references.values_list("attribute", flat=True)
-                    ):
-                        continue
-
-                # Meta fields have more than one value (potentially), so iterate...
-                for field in getattr(instance, field_set.name).all():
-                    item = {"@id": f"{instance.pk}_m2m_{field_set.name}_{field.pk}"}
-                    item["statementType"] = {"uri": "", "label": field.name}
-                    item["statementText"] = ""
-
-                    item["name"] = ""
-                    item["statementType"] = {"uri": "", "label": ""}
-                    item["memberOf"] = {"uri": [], "label": ""}
-                    item["place"] = {"uri": "", "label": ""}
-                    # item["relatesToPerson"] = {"uri": "", "label": ""}
-
-                    item["role"] = {"uri": "NONE", "label": field_set.name}
-                    item["date"] = {"sortdate": None, "label": ""}
-
-                    r_list.append(item)
-        for item in r_list:
-            # print(item)
-            item["P"] = PersonIndex.items([instance])
-            item["F"] = FactoidIndex.items([(instance, _source)])
-            item["S"] = SourceIndex.items([(instance, _source)])
-        yield from (
-            StatementIndex.Document(id=item.pop("@id"), **item) for item in r_list
-        )
-
-
 class SourceIndex(PySolaar):
     class Meta:
         store_document_fields = DocumentFields(
@@ -720,6 +390,318 @@ class SourceIndex(PySolaar):
             )
 
         return self.Document(**doc)
+
+
+class StatementIndex(PySolaar):
+    class Meta:
+        store_document_fields = DocumentFields(
+            id=True,
+            uris=True,
+            statementType=True,
+            name=True,
+            role=True,
+            date=True,
+            places=True,
+            relatesToPersons=ChildDocument(id=True, uris=True,),
+            memberOf=True,
+            statementText=True,
+            createdBy=True,
+            createdWhen=True,
+            modifiedBy=True,
+            modifiedWhen=True,
+            P=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+            ),
+            F=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+            ),
+            S=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+            ),
+        )
+        return_document_fields = DocumentFields(
+            id=TransformKey("@id"),
+            uris=True,
+            statementType__label=SingleValue,
+            statementType__uri=True,
+            name=True,
+            role__label=SingleValue,
+            role__uri=True,
+            date__sortdate=True,
+            date__label=True,
+            memberOf__label=SingleValue,
+            memberOf__uri=True,
+            statementText=SingleValue,
+            relatesToPersons=ChildDocument(uris=True, label=SingleValue,),
+            createdBy=SingleValue,
+            createdWhen=SingleValue,
+            modifiedBy=SingleValue,
+            modifiedWhen=SingleValue,
+        )
+
+    def build_document_set(self):
+        """The Statement document set identifiers are all combinations of
+        Person x [Person->Sources, None]"""
+        for person in Person.objects.all():
+            references = Reference.objects.filter(object_id=person.pk)
+            for source in [*references, None]:
+                print(
+                    f"Building StatementIndex for [Person:{person.pk}, Source:{source}]"
+                )
+                yield from self.build_document((person, source))
+
+    # build_document_set = None
+
+    def _build_document_template(id_string, instance, source):
+        item = {"id": id_string}
+
+        item["name"] = " "
+        item["statementType"] = {"uri": None, "label": None}
+        item["memberOf"] = {"uri": None, "label": None}
+        item["place"] = {"uri": None, "label": None}
+        item["relatesToPerson"] = {"uri": None, "label": None}
+        item["role"] = {"uri": None, "label": None}
+        item["date"] = {"sortdate": None, "label": None}
+        item["P"] = PersonIndex.items([instance])
+        item["F"] = FactoidIndex.items([(instance, source)])
+        item["S"] = SourceIndex.items([(instance, source)])
+        return item
+
+    def build_document(self, identifier):
+
+        instance, _source = identifier
+
+        r_list = []
+
+        # Get relation types for a person, exclude PersonPerson as more complex (tackle below)
+        relation_types = ContentType.objects.filter(
+            app_label="apis_relations", model__icontains="person"
+        ).exclude(model="PersonPerson")
+
+        if _source:
+            # If we have a source ID provided, look up that up in references
+            references = Reference.objects.filter(bibs_url=_source)
+
+        # Go through each relation type ('PersonInstitute', 'PersonPlace', 'PersonEvent'...)
+        # and get the specific relations of each type for the person instance
+        for relation_type in relation_types:
+
+            # If we provide a source to limit by, add that as a filter
+            if _source:
+                relation_queryset = relation_type.model_class().objects.filter(
+                    related_person=instance,
+                    pk__in=list(references.values_list("object_id", flat=True)),
+                )
+            # Otherwise get them all...
+            else:
+                relation_queryset = relation_type.model_class().objects.filter(
+                    related_person=instance
+                )
+
+            for relation in relation_queryset:
+
+                relation_type_name = relation_type.model_class().__name__
+                item = self._build_document_template(
+                    f"{instance.pk}_{relation_type_name}_{relation.pk}",
+                    instance,
+                    _source,
+                )
+
+                item["statementType"][
+                    "uri"
+                ] = "statement_type_uri"  # relation.relation_type.pk
+                item["statementType"][
+                    "label"
+                ] = "statement_type_label"  # relation.relation_type.label
+
+                item["role"]["label"] = (
+                    getattr(relation.relation_type, "reverse_name", None)
+                    or relation.relation_type.name
+                )
+                item["date"]["sortdate"] = relation.start_date or relation.end_date
+                item["date"]["label"] = (
+                    f"{relation.start_date}-{relation.end_date}"
+                    if relation.start_date and relation.end_date
+                    else str(relation.start_date)
+                )
+
+                if relation_type_name == "PersonInstitution":
+                    item["memberOf"]["uri"] = [
+                        str(url) for url in relation.related_institution.uri_set.all()
+                    ] + [relation.related_institution.get_absolute_url()]
+                    item["memberOf"]["label"] = relation.related_institution.name
+
+                if relation_type_name == "PersonPlace":
+                    item["place"]["uri"] = [
+                        str(url) for url in relation.related_place.uri_set.all()
+                    ] + [relation.related_place.get_absolute_url()]
+                    item["place"]["label"] = relation.related_place.name
+
+                item["statementText"] = str(relation)
+
+                ver = Version.objects.get_for_object(relation).order_by(
+                    "revision__date_created"
+                )
+                if ver:
+                    item["createdBy"] = str(ver.first().revision.user)
+                    item["createdWhen"] = ver.first().revision.date_created
+                    item["modifiedBy"] = str(ver.last().revision.user)
+                    item["modifiedWhen"] = ver.last().revision.date_created
+
+                yield StatementIndex.Document(**item)
+
+        # Here we do same as above, for PersonPerson relations.
+        # But obviously more complex as persons can be A or B in a relation
+
+        # Build specific relation sets, and assign whether instance is A or B in relation
+        for A_or_B, relation_set in [
+            *[
+                ("A", rel)
+                for rel in [
+                    relation_type_set.personperson_set.filter(
+                        related_personA=instance
+                    ).all()
+                    for relation_type_set in instance.personB_relationtype_set.all()
+                ]
+            ],
+            *[
+                ("B", rel)
+                for rel in [
+                    relation_type_set.personperson_set.filter(
+                        related_personB=instance
+                    ).all()
+                    for relation_type_set in instance.personA_relationtype_set.all()
+                ]
+            ],
+        ]:
+
+            # Iterate all the relations in each set
+            for relation in relation_set:
+
+                item = self._build_document_template(
+                    f"{instance.pk}__PersonPerson_{relation.relation_type.pk}__{relation.pk}",
+                    instance,
+                    _source,
+                )
+
+                # Unpack related person, depending on role A or B
+                item["relatesToPerson"]["label"] = (
+                    PersonIndex.items(relation.related_personB)
+                    if A_or_B == "A"
+                    else PersonIndex.items(relation.related_personA)
+                )
+                item["relatesToPerson"]["uri"] = ""
+
+                item["statementType"][
+                    "uri"
+                ] = "statement_type_uri"  # relation.relation_type.pk
+                item["statementType"][
+                    "label"
+                ] = "statement_type_label"  # relation.relation_type.label
+
+                item["role"]["label"] = (
+                    relation.relation_type.name
+                    if A_or_B == "A"
+                    else relation.relation_type.name_reverse
+                )
+                item["date"]["sortdate"] = relation.start_date or relation.end_date
+                item["date"]["label"] = (
+                    f"{relation.start_date}-{relation.end_date}"
+                    if relation.start_date and relation.end_date
+                    else relation.start_date_written
+                    if relation.start_date_written
+                    else str(relation.start_date)
+                )
+
+                item["statement-text"] = str(relation)
+
+                ver = Version.objects.get_for_object(relation).order_by(
+                    "revision__date_created"
+                )
+                item["createdBy"] = str(ver.first().revision.user)
+                item["createdWhen"] = ver.first().revision.date_created
+                item["modifiedBy"] = str(ver.last().revision.user)
+                item["modifiedWhen"] = ver.last().revision.date_created
+
+                yield StatementIndex.Document(**item)
+
+        # Iterate over _meta.fields and then get the value
+        # calling .value_to_string on object for each _meta.field
+        for f in instance._meta.fields:
+            """
+            From this loop it seems we take:
+            - name -- apis_metainfo.TempEntityClass.name
+            - date-of-birth -- apis_metainfo.TempEntityClass.start_date
+            - date-of-death -- apis_metainfo.TempEntityClass.end_date
+            - first-name -- apis_entities.Person.first_name
+            - gender -- apis_entities.Person.gender
+
+            """
+            field_name = re.search(r"([A-Za-z]+)\'>", str(f.__class__)).group(1)
+            if field_name in [
+                "CharField",
+                "DateField",
+                "DateTimeField",
+                "IntegerField",
+                "FloatField",
+                "ForeignKey",
+            ] and f.name.lower() not in {"source", "status"}:
+
+                item = self._build_document_template(
+                    f"{instance.pk}_attrb_{f.name}", instance, _source
+                )
+
+                if f.name in {"name", "first_name"}:
+                    item["statementType"]["uri"] = "statement_type_uri"
+                    item["role"]["label"] = f"has {f.name.replace('_', ' ')}"
+                    item["name"] = f.value_to_string(instance)
+
+                if f.name == "gender":
+                    item["statementType"]["uri"] = "statement_type_uri"
+                    item["statementType"]["label"] = f.value_to_string(instance)
+                    item["role"]["label"] = "gender"
+                    item["statementText"] = f"has gender {f.value_to_string(instance)}"
+
+                if f.name == "start_date":
+                    item["statementType"]["uri"] = "statement_type_uri"
+                    item["role"]["label"] = "birth"
+                    item["date"]["sortdate"] = f.value_from_object(instance)
+
+                if f.name == "end_date":
+                    item["statementType"]["uri"] = "statement_type_uri"
+                    item["role"]["label"] = "death"
+                    item["date"]["sortdate"] = f.value_from_object(instance)
+
+                if item["role"]["label"]:
+                    yield StatementIndex.Document(**item)
+
+        # Iterate many to many-to-many fields
+        for field_set in instance._meta.many_to_many:
+            if str(field_set.related_model.__module__).endswith(
+                "apis_vocabularies.models"
+            ) and not field_set.name.endswith("set"):
+
+                # If we limit by source, skip the field
+                if _source:
+                    if field_set.name not in list(
+                        references.values_list("attribute", flat=True)
+                    ):
+                        continue
+
+                # Meta fields have more than one value (potentially), so iterate...
+                for field in getattr(instance, field_set.name).all():
+                    item = self._build_document_template(
+                        f"{instance.pk}_m2m_{field_set.name}_{field.pk}",
+                        instance,
+                        _source,
+                    )
+                    item["statementType"] = {"uri": "", "label": field.name}
+
+                    item["role"] = {"uri": "NONE", "label": field_set.name}
+
+                    yield StatementIndex.Document(**item)
+
+        # yield from (StatementIndex.Document(**item) for item in r_list)
 
 
 def run():
