@@ -8,6 +8,55 @@ from rest_framework.views import APIView
 from apis_ipif_solr.indexes import PersonIndex, StatementIndex
 
 
+def apply_statement_params(queryset, params, statements_parent_key="ST"):
+    """ Apply statement-specific filters to a given queryset.
+    
+    Should be used for all Views where filtering by statement is required
+    (Person, Factoid, Source) """
+
+    STATEMENT_PARAM_KEYS = [
+        "statementText",
+        "relatesToPerson",
+        "memberOf",
+        "role",
+        "name",
+        "from",
+        "to",
+        "place",
+    ]
+
+    statement_filter_q_list = []
+    for statement_param_key in STATEMENT_PARAM_KEYS:
+        statement_param_value = params.get(statement_param_key)
+        if statement_param_value:
+            if statement_param_key == "to":
+                statement_filter_q_list.append(
+                    Q(date__sortdate__lte=statement_param_value)
+                )
+            elif statement_param_key == "from":
+                statement_filter_q_list.append(
+                    Q(date__sortdate__gte=statement_param_value)
+                )
+            elif statement_param_key in ("statementText", "name",):
+                q = Q(**{statement_param_key: statement_param_value})
+                statement_filter_q_list.append(q)
+            else:
+                q = Q(**{f"{statement_param_key}__uri": statement_param_value}) | Q(
+                    **{f"{statement_param_key}__label": statement_param_value}
+                )
+                statement_filter_q_list.append(q)
+
+    if statement_filter_q_list:
+        statement_filter_q_object = statement_filter_q_list[0]
+        for q in statement_filter_q_list[1:]:
+            statement_filter_q_object &= q
+        print("filtering", statement_filter_q_object)
+        queryset = queryset.filter_by_distinct_child(
+            statement_filter_q_object, field_name=statements_parent_key
+        )
+    return queryset
+
+
 class PersonListView(APIView):
     def get(self, request, format=None):
         """
@@ -47,46 +96,7 @@ class PersonListView(APIView):
 
         person_result = PersonIndex
 
-        STATEMENT_PARAM_KEYS = [
-            "statementText",
-            "relatesToPerson",
-            "memberOf",
-            "role",
-            "name",
-            "from",
-            "to",
-            "place",
-        ]
-
-        statement_filter_q_list = []
-        for statement_param_key in STATEMENT_PARAM_KEYS:
-            statement_param_value = params.get(statement_param_key)
-            if statement_param_value:
-                if statement_param_key == "to":
-                    statement_filter_q_list.append(
-                        Q(date__sortdate__lte=statement_param_value)
-                    )
-                elif statement_param_key == "from":
-                    statement_filter_q_list.append(
-                        Q(date__sortdate__gte=statement_param_value)
-                    )
-                elif statement_param_key in ("statementText", "name",):
-                    q = Q(**{statement_param_key: statement_param_value})
-                    statement_filter_q_list.append(q)
-                else:
-                    q = Q(**{f"{statement_param_key}__uri": statement_param_value}) | Q(
-                        **{f"{statement_param_key}__label": statement_param_value}
-                    )
-                    statement_filter_q_list.append(q)
-
-        if statement_filter_q_list:
-            statement_filter_q_object = statement_filter_q_list[0]
-            for q in statement_filter_q_list[1:]:
-                statement_filter_q_object &= q
-            print("filtering", statement_filter_q_object)
-            person_result = person_result.filter_by_distinct_child(
-                statement_filter_q_object, field_name="ST"
-            )
+        person_result = apply_statement_params(person_result, params)
 
         p = params.get("p")
         if p:
