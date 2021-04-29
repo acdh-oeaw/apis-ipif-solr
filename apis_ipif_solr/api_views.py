@@ -47,13 +47,35 @@ def apply_statement_params(queryset, params, statements_parent_key="ST"):
                 statement_filter_q_list.append(q)
 
     if statement_filter_q_list:
-        statement_filter_q_object = statement_filter_q_list[0]
-        for q in statement_filter_q_list[1:]:
-            statement_filter_q_object &= q
-        print("filtering", statement_filter_q_object)
-        queryset = queryset.filter_by_distinct_child(
-            statement_filter_q_object, field_name=statements_parent_key
-        )
+        #######
+        # All the statement-params should apply to a single statement
+        #######
+        if params.get("combineStatementFilters") == "and":
+            statement_filter_q_object = statement_filter_q_list[0]
+            for q in statement_filter_q_list[1:]:
+                statement_filter_q_object &= q
+            queryset = queryset.filter_by_distinct_child(
+                statement_filter_q_object, field_name=statements_parent_key
+            )
+        #######
+        # At least one of the statement-params needs to apply to any statement
+        #######
+        elif params.get("combineStatementFilters") == "or":
+            statement_filter_q_object = statement_filter_q_list[0]
+            for q in statement_filter_q_list[1:]:
+                statement_filter_q_object |= q
+            queryset = queryset.filter_by_distinct_child(
+                statement_filter_q_object, field_name=statements_parent_key
+            )
+        #######
+        # Each statement-param must apply, but can be to distinct statements
+        #######
+        else:  # params["combineStatementFilters"] == "independent"
+            for q in statement_filter_q_list:
+                queryset = queryset.filter_by_distinct_child(
+                    q, field_name=statements_parent_key
+                )
+
     return queryset
 
 

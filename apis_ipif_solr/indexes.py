@@ -18,6 +18,7 @@ import re
 import json
 
 from django.contrib.contenttypes.models import ContentType
+from django.conf import settings
 from django.urls import reverse
 from apis_core.apis_entities.models import Person
 from reversion.models import Version
@@ -509,10 +510,11 @@ class StatementIndex(PySolaar):
 
                 item["statementType"][
                     "uri"
-                ] = "statement_type_uri"  # relation.relation_type.pk
+                ] = ""  # f"APIS_VOCAB/{relation.related_type_id}"  # TODO: proper vocab!
+
                 item["statementType"][
                     "label"
-                ] = "statement_type_label"  # relation.relation_type.label
+                ] = f"relatedTo{relation_type_name.replace('Person', '')}"
 
                 item["role"]["label"] = (
                     getattr(relation.relation_type, "reverse_name", None)
@@ -594,10 +596,9 @@ class StatementIndex(PySolaar):
 
                 item["statementType"][
                     "uri"
-                ] = "statement_type_uri"  # relation.relation_type.pk
-                item["statementType"][
-                    "label"
-                ] = "statement_type_label"  # relation.relation_type.label
+                ] = ""  # f"APIS_VOCAB/{relation.vocab_name_id}"  # TODO: proper vocab!
+
+                item["statementType"]["label"] = "RelatedToPerson"
 
                 item["role"]["label"] = (
                     relation.relation_type.name
@@ -652,7 +653,8 @@ class StatementIndex(PySolaar):
                 )
 
                 if f.name in {"name", "first_name"}:
-                    item["statementType"]["uri"] = "statement_type_uri"
+                    item["statementType"]["uri"] = ""
+                    item["statementType"]["label"] = "hasName"
                     item["role"]["label"] = f"has {f.name.replace('_', ' ')}"
                     item["name"] = f.value_to_string(instance)
 
