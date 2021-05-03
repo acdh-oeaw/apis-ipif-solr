@@ -403,7 +403,7 @@ class StatementIndex(PySolaar):
             role=True,
             date=True,
             places=True,
-            relatesToPersons=ChildDocument(id=True, uris=True,),
+            relatesToPersons=JsonChildDocument(id=True, uris=True, label=True),
             memberOf=True,
             statementText=True,
             createdBy=True,
@@ -460,7 +460,7 @@ class StatementIndex(PySolaar):
         item["statementType"] = {"uri": None, "label": None}
         item["memberOf"] = {"uri": None, "label": None}
         item["place"] = {"uri": None, "label": None}
-        item["relatesToPerson"] = {"uri": None, "label": None}
+        item["relatesToPersons"] = PersonIndex.items([])
         item["role"] = {"uri": None, "label": None}
         item["date"] = {"sortdate": None, "label": None}
         item["P"] = PersonIndex.items([instance])
@@ -587,12 +587,11 @@ class StatementIndex(PySolaar):
                 )
 
                 # Unpack related person, depending on role A or B
-                item["relatesToPerson"]["label"] = (
+                item["relatesToPersons"] = (
                     PersonIndex.items(relation.related_personB)
                     if A_or_B == "A"
                     else PersonIndex.items(relation.related_personA)
                 )
-                item["relatesToPerson"]["uri"] = ""
 
                 item["statementType"][
                     "uri"

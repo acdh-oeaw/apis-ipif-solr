@@ -1,0 +1,1184 @@
+openapi: 3.0.2
+info:
+  version: 0.3.3
+  title: prosopogrAPhI
+  description: basic prosopographical data API
+  license:
+    name: CC-BY-SA 4.0
+    url: 'https://creativecommons.org/licenses/by-sa/4.0/'
+  contact:
+    name: Georg Vogeler
+    email: georg.vogeler@uni-graz.at
+paths:
+  /factoids:
+    get:
+      summary: Returns array of factoids
+      description: Returns an array of `Factoid` objects. The number of array members returned with each response is restricted by the **size** parameter. Factoids can be filtered by setting additional parameters like **personId** or **p**. Factoids are sorted by default by date of creation time.
+      operationId: getFactoids
+      parameters:
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/personId'
+        - $ref: '#/components/parameters/p'
+        - $ref: '#/components/parameters/statementId'
+        - $ref: '#/components/parameters/st'
+        - $ref: '#/components/parameters/sourceId'
+        - $ref: '#/components/parameters/s'
+        - $ref: '#/components/parameters/f'
+        - $ref: '#/components/parameters/statementText'
+        - $ref: '#/components/parameters/relatesToPerson'
+        - $ref: '#/components/parameters/memberOf'
+        - $ref: '#/components/parameters/role'
+        - $ref: '#/components/parameters/name'
+        - $ref: '#/components/parameters/from'
+        - $ref: '#/components/parameters/to'
+        - $ref: '#/components/parameters/place'
+        - $ref: '#/components/parameters/sortBy'
+      responses:
+        '200':
+          description: A list of Factoids with some metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactoidsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+    post:
+      summary: 'creates a factoid. No Factoid can be created without references to a person, a source, and at least one statement'
+      operationId: createFactoid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Factoid'
+        description: the factoid data
+      responses:
+        '201':
+          description: factoid created
+        '400':
+          description: factoid could not be created or updated
+        '403':
+          description: Forbidden. Missing token or user is not allowed to create persons.
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+  '/factoids/{id}':
+    get:
+      summary: 'Returns factoid with id {id}'
+      operationId: getFactoidById
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: a factoid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Factoid'
+        '404':
+          description: the factoid does not exist
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+    put:
+      summary: 'updates the factoid with the {id}'
+      operationId: updateFactoid
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Factoid'
+      responses:
+        '201':
+          description: factoid updated
+        '400':
+          description: factoid could not be updated or created. TODO should return reason as message
+        '403':
+          description: Forbidden. Missing token or user is not allowed to create persons.
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+
+    delete:
+      summary: 'delete the factoid with id {id}'
+      operationId: deleteFactoid
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Factoid has been deleted successfully
+        '403':
+          description: Missing token or user is not allowed to delete this factoid
+        '404':
+          description: Factoid not found
+        '409':
+          description: 'Conflict: Factoid cannot be deleted eg. because of referential integrity. Reason should be given as error response detail'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+  /persons:
+    get:
+      summary: Get persons
+      description: Returns an array of `Person` objects. The number of array members returned with each response is restricted by the **size** parameter. Persons can be filtered by setting additional parameters like **factoidId** or **f**. TODO Further parameters for filtering have to be specified.
+      operationId: getPersons
+      parameters:
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/p'
+        - $ref: '#/components/parameters/factoidId'
+        - $ref: '#/components/parameters/f'
+        - $ref: '#/components/parameters/statementId'
+        - $ref: '#/components/parameters/st'
+        - $ref: '#/components/parameters/sourceId'
+        - $ref: '#/components/parameters/s'
+        - $ref: '#/components/parameters/statementText'
+        - $ref: '#/components/parameters/relatesToPerson'
+        - $ref: '#/components/parameters/memberOf'
+        - $ref: '#/components/parameters/role'
+        - $ref: '#/components/parameters/name'
+        - $ref: '#/components/parameters/from'
+        - $ref: '#/components/parameters/to'
+        - $ref: '#/components/parameters/place'
+      responses:
+        '200':
+          description: Successfull response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+    post:
+      summary: Add a new person
+      operationId: createPerson
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Person'
+      responses:
+        '201':
+          description: Person created
+          headers:
+            Location:
+              description: the uri of the created person
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          description: Forbidden. Missing token or user is not allowed to create persons.
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+  '/persons/{id}':
+    get:
+      summary: 'Returns person with id {id}'
+      operationId: getPersonById
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: a person object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        '404':
+          description: the person does not exist
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+    put:
+      summary: 'Updates the person with the {id}'
+      operationId: updatePerson
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Person'
+        description: the person data
+      responses:
+        '201':
+          description: person updated
+        '400':
+          description: person could not be updated or created. TODO should return reason as message
+        '403':
+          description: Forbidden. Missing token or user is not allowed to create persons.
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+    delete:
+      summary: 'delete the person with id {id}'
+      operationId: deletePerson
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Person has been deleted successfully
+        '403':
+          description: Missing token or user is not allowed to delete this person
+        '404':
+          description: Person not found
+        '409':
+          description: 'Conflict: Person cannot be deleted eg. because of referential integrity. Reason should be given as error response detail'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+  /sources:
+    get:
+      summary: Returns array of source objects.
+      description: Returns array of `source` objects. The number of array members returned with each response is restricted by the **size** parameter. Sources can be filtered by setting additional parameters like **factoidId** or **f**. TODO Further parameters for filtering have to be specified.
+      operationId: getSources
+      parameters:
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/personId'
+        - $ref: '#/components/parameters/p'
+        - $ref: '#/components/parameters/factoidId'
+        - $ref: '#/components/parameters/f'
+        - $ref: '#/components/parameters/st'
+        - $ref: '#/components/parameters/statementText'
+        - $ref: '#/components/parameters/relatesToPerson'
+        - $ref: '#/components/parameters/memberOf'
+        - $ref: '#/components/parameters/role'
+        - $ref: '#/components/parameters/name'
+        - $ref: '#/components/parameters/from'
+        - $ref: '#/components/parameters/to'
+        - $ref: '#/components/parameters/place'
+      responses:
+        '200':
+          description: Successfull response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourcesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+    post:
+      summary: Add a new source
+      operationId: createSource
+      requestBody:
+        $ref: '#/components/requestBodies/Source'
+      responses:
+        '201':
+          description: Source created
+          headers:
+            Location:
+              description: the uri of the created source
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          description: Forbidden. Missing token or user is not allowed to create persons.
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+  '/sources/{id}':
+    get:
+      summary: 'Returns source with id {id}'
+      operationId: getSourceById
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: a source object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        '404':
+          description: the source does not exist
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+    put:
+      summary: 'updates the source with the {id}'
+      operationId: updateSource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: '#/components/requestBodies/Source'
+      responses:
+        '201':
+          description: source updated
+        '400':
+          description: source could not be updated or created. TODO should return reason as message
+        '403':
+          description: Forbidden. Missing token or user is not allowed to create sources.
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+    delete:
+      summary: 'delete the source with id {id}'
+      operationId: deleteSource
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Source has been deleted successfully
+        '403':
+          description: Missing token or user is not allowed to delete this source
+        '404':
+          description: Source not found
+        '409':
+          description: 'Conflict: Source cannot be deleted eg. because of referential integrity. Reason should be given as error response detail'
+        '501':
+          $ref: '#/components/responses/NotImplementedError'
+  /statements:
+    get:
+      summary: Returns array of statement objects
+      description: Returns array of `Statement` objects. The number of array members returned with each response is restricted by the **size** parameter. Statements can be filtered by setting additional parameters like **factoidId** or **f**. TODO Further parameters for filtering have to be specified.
+      operationId: getStatements
+      parameters:
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/personId'
+        - $ref: '#/components/parameters/factoidId'
+        - $ref: '#/components/parameters/f'
+        - $ref: '#/components/parameters/sourceId'
+        - $ref: '#/components/parameters/st'
+        - $ref: '#/components/parameters/p'
+        - $ref: '#/components/parameters/statementText'
+        - $ref: '#/components/parameters/relatesToPerson'
+        - $ref: '#/components/parameters/memberOf'
+        - $ref: '#/components/parameters/role'
+        - $ref: '#/components/parameters/name'
+        - $ref: '#/components/parameters/from'
+        - $ref: '#/components/parameters/to'
+        - $ref: '#/components/parameters/place'
+      responses:
+        '200':
+          description: Successfull response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatementsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+  '/statements/{id}':
+    get:
+      summary: 'Return statement with id {id}'
+      operationId: getStatementById
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: a statement object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statement'
+        '404':
+          description: the statement does not exist
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+
+  /describe:
+    get:
+      description: Gives basic information about the service and the implementation of API
+      operationId: getDescription
+      responses:
+        '200':
+          description: basic information about the service and the implementation of the API
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDescription'
+        '500':
+          $ref: '#/components/responses/Standard500ErrorResponse'
+servers:
+  - url: 'https://localhost/api'
+  - url: 'http://localhost/api'
+components:
+  parameters:
+    size:
+      name: size
+      in: query
+      description: sets the  number of objects returned per page.
+      schema:
+        type: integer
+        default: 30
+    page:
+      name: page
+      in: query
+      description: 'Sets the page number of returned objects. If size is set to 10 and page is set to 2, the objects 11-20 will be returned.'
+      schema:
+        type: integer
+        default: 1
+    id:
+      name: id
+      in: path
+      required: true
+      description: 'can be either the local id, or an uri representing the same resource as stored in `uris`'
+      schema:
+        type: string
+    sortBy:
+      # TODO: this must be more precise: allowed values per endpoint
+      # TODO: how to address properties not on level 0?
+      name: sortBy
+      in: query
+      description: 'defines the sort order of the requested resource, can contain all properties of the resource searched. The closing keywords ''ASC'' and ''DESC'' describe the sort order as ''ASCending'' and ''DESCending''. In case the property is a list of values, use the first item.'
+      schema:
+        type: string
+        default: createdWhen
+    personId:
+      name: personId
+      in: query
+      description: filter by person id
+      schema:
+        type: string
+    p:
+      name: p
+      in: query
+      description: filters the current resource by a search in direct properties of person object (id, uri)
+      schema:
+        type: string
+    statementId:
+      name: statementId
+      in: query
+      description: filter by statement id
+      schema:
+        type: string
+    st:
+      name: st
+      in: query
+      description: filters by applying a pattern on statements (fulltext search). This filter will be combined by an AND operator with all other filters applicable to statements (statementText, role, from, to, place, name, relatesToPerson, memberOf).
+      schema:
+        type: string
+    sourceId:
+      name: sourceId
+      in: query
+      description: filter by source id
+      schema:
+        type: string
+    s:
+      name: s
+      in: query
+      description: filter by applying a pattern on sources (fulltext search)
+      schema:
+        type: string
+    f:
+      name: f
+      in: query
+      description: filter by applying a pattern on factoid metadata (fulltext search)
+      schema:
+        type: string
+    factoidId:
+      name: factoidId
+      in: query
+      description: filter by factoid id
+      schema:
+        type: string
+    statementText:
+      name: statementText
+      in: query
+      description: filters by any keyword occurring in the statement content. This filter will be combined by an AND operator with all other filters applicable to statements (st, role, from, to, place, name, relatesToPerson, memberOf).
+      schema:
+        type: string
+    role:
+      name: role
+      in: query
+      description: filters by a keyword occuring in the role property of a statement. The filter applies to the human readable label and the URI provided. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, from, to, place, name, relatesToPerson, memberOf).
+      schema:
+        type: string
+    from:
+      name: from
+      in: query
+      description: 'all dates after the event date (including the event date itself) will be included. If `from` and `to` are the same, only a single exact date is included. Fragments (yyyy, yyyy-mm) will be interpreted as exact time ranges if the second parameter is missing (`from=yyyy-mm` is interpreted as `from=start of month`, `to=end of month`. If conflicting data is present, for example ``from=yyyy&to=yyyy-mm-dd`, the most correct interpretation will be decided on by the backend. For instance, the example before will be interpreted as `from=yyyy-01-01&to=yyyy-mm-dd`. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, role, to, place, name, relatesToPerson, memberOf).'
+      schema:
+        type: string
+    to:
+      name: to
+      in: query
+      description: 'all dates before the event date (including the event date itself) will be included. If `from` and `to` are the same, only a single exact date is included. Fragments (yyyy, yyyy-mm) will be interpreted as exact time ranges if the second parameter is missing (`from=yyyy-mm` is interpreted as `from=start of month`, `to=end of month`. If conflicting data is present, for example ``from=yyyy&to=yyyy-mm-dd`, the most correct interpretation will be decided on by the backend. For instance, the example before will be interpreted as `from=yyyy-01-01&to=yyyy-mm-dd`. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, role, from, place, name, relatesToPerson, memberOf).'
+      schema:
+        type: string
+    place:
+      name: place
+      in: query
+      description: filters by a keyword occuring in the place  property of a statement. The filter applies to the human readable label and the URI provided. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, role, from, to, name, relatesToPerson, memberOf).
+      schema:
+        type: string
+    relatesToPerson:
+      name: relatesToPerson
+      in: query
+      description: filters by a keyword occuring in the relations to other persons property of a statement. The filter applies to the human readable label and the URI provided. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, role, from, to, place, name, memberOf).
+      schema:
+        type: string
+    memberOf:
+      name: memberOf
+      in: query
+      description: filters by a keyword occuring in the membership in organisation property of a statement. The filter applies to the human readable label and the URI provided. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, role, from, to, place, name, relatesToPerson).
+      schema:
+        type: string
+    name:
+      name: name
+      in: query
+      description: filters by a keyword occuring in the names of a person. This filter will be combined by an AND operator with all other filters applicable to statements (st, statementText, role, from, to, place, relatesToPerson, memberOf).
+      schema:
+        type: string
+    createdBefore:
+      name: createdBefore
+      description: sets terminus antequem for filtering by createdWhen
+      in: query
+      schema:
+        type: string
+    createdAfter:
+      name: createdAfter
+      description: sets terminus postquem for filtering by createdWhen
+      in: query
+      schema:
+        type: string
+    createdBy:
+      name: createdBy
+      in: query
+      description: Filters by full text search in the description of the user responsbile for the creation of the object. A group of persons is represented by a comma seperated list.
+      schema:
+        type: string
+    modifiedBefore:
+      name: createdBefore
+      in: query
+      description: sets terminus antequo for filtering the date of modification of the current resource.
+      schema:
+        type: string
+    modifiedAfter:
+      name: createdAfter
+      description: sets terminus postquem for filtering the date of modification of the current resource.
+      in: query
+      schema:
+        type: string
+    modifiedBy:
+      name: createdBy
+      in: query
+      description: Filters by full text  search in the description of the user responsbile for a modification of the object. A group of persons is represented by a comma seperated list.
+      schema:
+        type: string
+    depth:
+      name: depth
+      in: query
+      description: 'declares the depth of description to be returned by a list of factoids. With the keyword `reduced` the response should return only `@id` for the source, the person, and the statement aggregated by the factoid. If no value is given, the factoids return the full information.'
+      schema:
+        type: string
+        enum:
+          - full
+          - reduced
+  responses:
+    BadRequestError:
+      description: Bad request. Caused by unknown parameters or illegal parameter values
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Standard500ErrorResponse:
+      description: An unexpected error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotImplementedError:
+      description: Functionality not implemented. Some implementations will only support read operations. For any data modifying request they must return a 501 response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  requestBodies:
+    Source:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Source'
+      description: the source data
+    Statement:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Statement'
+  schemas:
+    FactoidRef:
+      description: 'References the local ID of a factoid in the current service and all IDs of person, sources, statements aggregated in the factoid. Please use the `factoids/{id}-endpoint` to request further information on the factoid. The factoid reference does not apply any filter used for requesting the current ressource.'
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+        person-ref:
+          $ref: '#/components/schemas/PersonRef'
+        source-ref:
+          $ref: '#/components/schemas/SourceRef'
+        statement-refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementRef'
+    Factoid:
+      description: A Factoid is a composite of one or more statements about a single person extracted by somebody from a single source at a specific time.
+      type: object
+      required:
+        - '@id'
+        - person-ref
+        - source-ref
+        - statement-refs
+        - createdBy
+        - createdWhen
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+        createdBy:
+          $ref: '#/components/schemas/createdBy'
+        createdWhen:
+          $ref: '#/components/schemas/createdWhen'
+        modifiedBy:
+          $ref: '#/components/schemas/modifiedBy'
+        modifiedWhen:
+          $ref: '#/components/schemas/modifiedWhen'
+        derivedFrom:
+          description: references the URI of a factoid on which this factoid is based.
+          type: string
+          format: uri
+        person-ref:
+          $ref: '#/components/schemas/PersonRef'
+        source-ref:
+          $ref: '#/components/schemas/SourceRef'
+        statement-refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementRef'
+      example:
+        '@id': TW_Pez1_809_1
+        createdBy: Thomas Wallnig
+        createdWhen: 2010-05-05T00:00:00.000Z
+        modifiedBy: Thomas Wallnig
+        modifiedWhen: 2010-05-05T00:00:00.000Z
+        person-ref:
+          '@id': Andreas_Reuter
+        statement-refs:
+          - '@id': Pez1_809_1
+        source-ref: 
+          '@id': PezNachlassVol1
+    FactoidsResponse:
+      type: object
+      description: Schema of the response of /factoids
+      properties:
+        protocol:
+          $ref: '#/components/schemas/Protocol'
+        factoids:
+          type: array
+          items:
+            $ref: '#/components/schemas/Factoid'
+      example:
+        protocol:
+          size: 30
+          totalHits: 1234
+          page: 2
+        factoids:
+          - '@id': TW_Pez1_809_1
+            createdBy: Thomas Wallnig
+            createdWhen: 2010-05-05T00:00:00.000Z
+            modifiedBy: Thomas Wallnig
+            modifiedWhen: 2010-05-05T00:00:00.000Z
+            person-ref:
+              '@id': Andreas_Reuter
+            statement-refs:
+              - '@id': Pez1_809_1
+            source-ref: 
+              '@id': PezNachlassVol1
+          - '@id': TW_Pez1_123456
+            createdBy: Thomas Wallnig
+            createdWhen: 2007-04-16T00:00:00.000Z
+            modifiedBy: Thomas Wallnig
+            modifiedWhen: 2007-04-16T00:00:00.000Z
+            person-ref:
+              '@id': Placidus_Seiz
+            statement-refs:
+              - '@id': person1241
+            source-ref:
+              '@id': 'Lindner-Album_Ettalense253f.'
+          - '@id': Fd2qwr
+            createdBy: Thomas Wallnig
+            createdWhen: 2007-04-16T00:00:00.000Z
+            modifiedBy: Thomas Wallnig
+            modifiedWhen: 2007-07-01T00:00:00.000Z
+            person-ref:
+              '@id': Andreas_Reuter
+            statement-refs:
+              - '@id': Fd2qwr
+            source-ref:
+              '@id': PezNachlassVol1
+    PersonRef:
+      description: 'References the local ID of a person in the current service. Please use the persons/{id}-endpoint to request further information on the person'
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+    Person:
+      type: object
+      description: 'A Person is an abstract entity representing a human individual (fictional or historical) independet from their cultural desciption by name, status, social relationsships etc. It has therefore only formal identifiers as properties.'
+      required:
+        - '@id'
+        - factoid-refs
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+        label:
+          type: string
+          description: 'A human readable identification of the person for easy processing in selection scenarios. This identification is considered to be unstable, does not have to be stored in the backend (i.e. it might be created algorithmically on the fly from a currente state of data stored), can be ommitted (then the @id can be used as default) and is not processed in POST or PUT requests. In practice, this label would typically be constructed from statements on names, basic biographical dates (birth, death) and maybe a claim of fame / occupation, but the decision how to construct this label would be completely under responsibility of the service provider.'
+        uris:
+          $ref: '#/components/schemas/uris'
+        createdBy:
+          $ref: '#/components/schemas/createdBy'
+        createdWhen:
+          $ref: '#/components/schemas/createdWhen'
+        modifiedBy:
+          $ref: '#/components/schemas/modifiedBy'
+        modifiedWhen:
+          $ref: '#/components/schemas/modifiedWhen'
+        factoid-refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FactoidRef'
+      example:
+        - '@id': Placidus_Seiz
+          uris:
+            - 'http://d-nb.info/gnd/10102407X'
+            - 'https://viaf.org/viaf/5285530/'
+          factoid-refs:
+            - '@id': TW_Pez1_123456
+              source-ref:
+                '@id': 'Pez#474'
+              statement-refs:
+                - '@id': 'Pez#474-7'
+            - '@id': TW_Pez1_123457
+              source-ref:
+                '@id': 'Lindner-Album_Ettalense253f.'
+              statement-refs:
+                - '@id': person1241
+    PersonsResponse:
+      type: object
+      description: Schema of the response of /persons
+      properties:
+        protocol:
+          $ref: '#/components/schemas/Protocol'
+        persons:
+          type: array
+          items:
+            $ref: '#/components/schemas/Person'
+      example:
+        protocol:
+          size: 30
+          totalHits: 12345
+          page: 2
+        persons:
+          - '@id': Andreas_Reuter
+            label: Andreas Reuter, Autor, um 1650
+            uris:
+              - 'http://pez-digital.at/persons#Mauro_Aspini'
+            factoid-refs:
+              - '@id': Fd2qwr
+                source-ref:
+                  '@id': PezNachlassVol1
+                statement-refs:
+                  - '@id': Fd2qwr
+              - '@id': TW_Pez1_809_1
+                source-ref:
+                  '@id': PezNachlassVol1
+                statement-refs:
+                  - '@id': Pez1_809_1
+          - '@id': Placidus_Seiz
+            label: Seitz, Placidus, Theologe, Abt, Schriftsteller, Benediktiner, 1672-1736.
+            uris:
+              - 'http://d-nb.info/gnd/10102407X'
+              - 'https://viaf.org/viaf/5285530/'
+            factoid-refs:
+              - '@id': TW_Pez1_123456
+                source-ref:
+                  '@id': 'Pez#474'
+                statement-refs:
+                  - '@id': 'Pez#474-7'
+              - '@id': TW_Pez1_123457
+                source-ref:
+                  '@id': 'Lindner-Album_Ettalense253f.'
+                statement-refs:
+                  - '@id': person1241
+    StatementRef:
+      description: 'References the local ID of a statement he current service. Please use the statements/{id}-endpoint to request further information on the statement and its content'
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+    Statement:
+      type: object
+      description: The statement object gives human and machine readable information on the person(s) listed in the factoid.
+      required:
+        - '@id'
+        - factoid-refs
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+        uris:
+          $ref: '#/components/schemas/uris'
+        factoid-refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FactoidRef'
+        statementType:
+          type: object
+          description: 'in context of structured information (with places, relationships, etc.) this property gives the type of event, relationship etc. connecting the other properties'
+          properties:
+            uri:
+              type: string
+              format: uri
+              description: 'A fully dereferencably URI, which could be an endpoint to RESTful API for the applied taxonomy'
+            label:
+              type: string
+              description: descriptive text. We can imagine this to be a term from a controlled vocabulary or a short type name.
+        name:
+          type: string
+          description: any verbal identification of a person
+        role:
+          type: object
+          description: describes the role of the person in the statement. If empty it is considered generically as 'participates in something which could be an event'
+          properties:
+            uri:
+              type: string
+              format: uri
+              description: 'A fully dereferencably URI, which could be an endpoint to RESTful API for the applied taxonomy'
+            label:
+              type: string
+              description: descriptive text of the role of the person in the statement.
+        date:
+          type: object
+          description: 'The temporal allocation of the statement: To which time frame the statement on the person applies?'
+          properties:
+            sortdate:
+              type: string
+              format: date
+              description: 'Formal version of the date following W3C recommendations. This date is not expected to represent the full range of possible dating. Use the label property to describe the date in more detail dates by century, by year, time ranges, date not before/not after, and similar.'
+            label:
+              type: string
+              description: 'verbal version of the date, which should enable the human reader to get an idea of the chronological concept.'
+        places:
+          description: 'describes the geographical information of the statement, e.g. the place where an event happened, the geographic coverage of a social role etc. The API does not commit to the existence of a georeference with coordinates of the location, but suggests to use supplementarily the geo-JSON `geometry` property.'
+          type: array
+          items:
+            type: object
+            properties:
+              uri:
+                type: string
+                format: uri
+                description: 'reference to geo-referenceable object (e.g. single place), preferably an endpoint of an RESTful API serving coordinates of a single place or a polygon together with information on projection used.'
+              label:
+                type: string
+                description: 'verbal reference to geo-referenceable object, e.g. name of a city, name of an area.'
+        relatesToPersons:
+          description: relationships of the person on which the statement is made to other persons.
+          type: array
+          items:
+            type: object
+            properties:
+              uri:
+                type: string
+                format: uri
+                description: 'reference to a machine readably object on a person, preferably an endpoint following the definitions of this API.'
+              label:
+                type: string
+                description: 'a human readable description of the person to which the statement relates the persons referenced in the factoid, e.g. the name of the person'
+        memberOf:
+          type: object
+          description: relationship of the person on which the statement is made to institutions or groups of persons identifiable.
+          properties:
+            uri:
+              type: string
+              format: uri
+            label:
+              type: string
+              description: a human readable description of the group/institution to which the statement relates the persons referenced in the factoid
+        statementText:
+          type: string
+          description: 'describes the statement in more detail, usually quotes from source or descriptive prose including the wording from the source or a short biogram.'
+        createdBy:
+          $ref: '#/components/schemas/createdBy'
+        createdWhen:
+          $ref: '#/components/schemas/createdWhen'
+        modifiedBy:
+          $ref: '#/components/schemas/modifiedBy'
+        modifiedWhen:
+          $ref: '#/components/schemas/modifiedWhen'
+    StatementsResponse:
+      type: object
+      description: Schema of the response of /statements
+      properties:
+        protocol:
+          $ref: '#/components/schemas/Protocol'
+        statements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Statement'
+      example:
+        protocol:
+          size: 30
+          totalHits: 1234
+          page: 2
+        statements:
+          - '@id': Pez1_809_1
+            factoid-refs:
+              - '@id': 'TW_Pez1_809_1'
+                person-ref:
+                  '@id': 'Andreas_Reuter'
+                source-ref:
+                  '@id': 'PezNachlassVol1'
+            statementText: 'Andreas Reuter (ca. 1648 Kremsm�nster – 1715 Gleink) war Konventuale von Gleink. Er war Doktor der Theologie, apostolischer Protonotar und wirkte in Gleink als Ökonom sowie insgesamt 22 Jahre lang als Prior. Als solcher begegnet er 1708 als Unterzeichner der Rotel auf Abt Rupert von Kimpflern und 1710 in seinem Brief an Bernhard Pez.'
+          - '@id': 'Pez#474-7,'
+            factoid-refs:
+              - '@id': ''
+                person-ref:
+                  '@id': 'Placidus_Seiz'
+                source-ref:
+                  '@id' : 'Pez#474'
+            statementText: '... , quam accepturum me spero a reverendissimo domino abbate Ettalensi ...'
+          - '@id': person1241
+            factoid-refs:
+              - '@id': TW_Pez1_123456
+                person-ref:
+                  '@id': Placidus_Seiz
+                source-ref: 
+                  '@id': 'Lindner-Album_Ettalense253f.'
+            name: 'Placidus Seitz'
+          - '@id': 'Fd2qwr'
+            factoid-refs:
+              - '@id': Fd2qwr
+                person-ref:
+                  '@id': Andreas_Reuter
+                source-ref: 
+                  '@id': PezNachlassVol1
+            date:
+              sortdate: 1648-06-15T00:00:00.000Z
+              label: ca. 1648
+            statementType:
+              - label: "Geburt"
+              - uri: "http://www.cidoc-crm.org/cidoc-crm/#E67_Birth"
+            places:
+              - label: Kremsm�nster
+    Protocol:
+      type: object
+      description: Provides metadata about the current request
+      properties:
+        size:
+          type: integer
+          description: Number of objects returned per page
+        page:
+          type: integer
+          description: 'Number of result page (first page, second page etc.)'
+        totalHits:
+          type: integer
+          description: Total number of objects found by this request
+    SourceRef:
+      description: 'References the local ID of a source in the current service. Please use the sources/{id}-endpoint to request further information on the source'
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+    Source:
+      type: object  
+      required:
+        - '@id'
+        - factoid-refs
+      properties:
+        '@id':
+          $ref: '#/components/schemas/id'
+        label:
+          description: 'A human readable description of the source of information for the factoid, e.g. a bibliographic reference, an archival shelfmark etc.'
+          type: string
+        uris:
+          $ref: '#/components/schemas/uris'
+        createdBy:
+          $ref: '#/components/schemas/createdBy'
+        createdWhen:
+          $ref: '#/components/schemas/createdWhen'
+        modifiedBy:
+          $ref: '#/components/schemas/modifiedBy'
+        modifiedWhen:
+          $ref: '#/components/schemas/modifiedWhen'
+        factoid-refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/FactoidRef'
+      example:
+        '@id': PezNachlassVol1
+        uris:
+          - 'https://e-book.fwf.ac.at/o:370'
+        metadata: 'Die gelehrte Korrespondenz der Br�der Pez, Text, Regesten, Kommentare; Band 1: 1709–1715, bearb. v. Thomas Wallnig u. Thomas Stockinger, Wien u. Köln: Böhlau, 2010'
+        factoid-refs:
+          - '@id': TW_Pez1_809_1
+            person-ref:
+              '@id': Andreas_Reuter
+            statement-refs:
+              - '@id': Pez1_809_1
+          - '@id': Fd2qwr
+            person-ref:
+              '@id': Andreas_Reuter
+            statement-refs:
+              - '@id': Fd2qwr
+    SourcesResponse:
+      type: object
+      description: Schema of the response of /sources
+      properties:
+        protocol:
+          $ref: '#/components/schemas/Protocol'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Source'
+      example:
+        protocol:
+          size: 30
+          totalHits: 1234
+          page: 2
+        sources:
+        - '@id': PezNachlassVol1
+          uris:
+            - 'https://e-book.fwf.ac.at/o:370'
+          metadata: 'Die gelehrte Korrespondenz der Br�der Pez, Text, Regesten, Kommentare; Band 1: 1709–1715, bearb. v. Thomas Wallnig u. Thomas Stockinger, Wien u. Köln: Böhlau, 2010'
+          factoid-refs:
+            - '@id': TW_Pez1_809_1
+              person-ref:
+                '@id': Andreas_Reuter
+              statement-refs:
+                - '@id': Pez1_809_1
+            - '@id': Fd2qwr
+              person-ref:
+                '@id': Andreas_Reuter
+              statement-refs:
+                - '@id': Fd2qwr
+        - '@id': 'Pez#474'
+          metadata: 'Melk, Stiftsarchiv, Kt. 07 Patres 07, II, 673r-675v'
+          factoid-refs:
+            - '@id': TW_Pez1_123457
+              person-ref:
+                '@id': Placidus_Seiz
+              statement-refs:
+                - '@id': 'Pez#474-7'
+        - '@id': Lindner-Album_Ettalense253f.
+          metadata: 'Lindner: Album Ettalense, S. 253f.'
+          factoid-refs:
+            - '@id': TW_Pez1_123456
+              person-ref:
+                '@id': Placidus_Seiz
+              statement-refs:
+                - '@id': person1241
+    ServiceDescription:
+      type: object
+      description: describes the service providing the API
+      required:
+        - complianceLevel
+      properties:
+        description:
+          description: A verbal description of the collection of factoids provided by the service
+          type: string
+        provider:
+          description: information on the service provider
+          type: string
+        contact:
+          description: 'address of a contact point (e-mail, phone etc.)'
+          type: string
+        vocabs:
+          description: "lists all vocabularies used for URIs in the `role` and `statemenType` properties of the statements. API consumers should be able to create valid assumption on URIs used in properties of the statements."
+          type: array
+          items:
+            type: string
+        complianceLevel:
+          type: number
+          description: |
+            defines the compliance level supported by the server. This is a numeric value between 0 and 2 which indicates the functionality provided by the service.
+
+            *Compliance level 0* is the most minimalistic implementation. It only supports  ``GET`` requests and a restricted set of filter parameters:                ``f=``, ``p=``, ``s=``, ``st=`` are not allowed and result in a ``400 Bad Request`` response as POST and PUT requests do.
+
+            *Compliance level 1* only supports ``GET`` requests (as compliance level ``0``  does), but supports all filter parameters. So compliance level ``0``  and ``1`` differ in that level ``1`` supports the filter parameters ``f=``, ``p=``, ``s=`` and ``st=``. POST und PUT requests result in a ``400 Bad Request``  response.
+
+            *Compliance level 2* supports the full API and therefore also allows creation and modification of resources via PUT and POST requests.
+
+            We recommend to publish the compliance level additionally als link header  with each response to a GET request in this form:
+
+            ``Link: <https://raw.githubusercontent.com/GVogeler/prosopogrAPhI/master/level1.json>;rel="profile"``
+        formats:
+          type: array
+          description: 'List of the supported response formats (content types). E.g.  ``application/json`` (default), ``application/xml``, ``application/rdf+xml``, ``application/x-turtle``, ...'
+          items:
+            type: string
+      example:
+        description: Prosopographical data from the 1890 census
+        provider: 'Centre for Information Modelling, University of Graz'
+        contact: contact@example.com
+        complianceLevel: 1
+        formats:
+          - application/json
+    id:
+      description: 'the local id of the object (factoid, person, source, statement)'
+      type: string
+    uri:
+      description: 'the uri of an object (role, place, organisation, type, factoid, person, source, statement, etc.).'
+      type: string
+      format: uri
+    uris:
+      description: 'a list of external uris of the current object (factoid, person, source, statement, etc.) which could be used as objects to owl:sameAs.'
+      type: array
+      items:
+        $ref: '#/components/schemas/uri'
+    createdBy:
+      type: string
+      description: The user responsbile for a creation of the object. A group of persons is represented by a comma seperated list.
+    createdWhen:
+      description: ''
+      type: string
+      format: date
+    modifiedBy:
+      type: string
+      description: The user responsbile for a modification of the object. A group of persons is represented by a comma seperated list.
+    modifiedWhen:
+      description: ''
+      type: string
+      format: date
+    Error:
+      type: object
+      required:
+        - status
+        - title
+      properties:
+        status:
+          type: number
+          description: 'The HTTP status code ([RFC7231], Section 6) generated by the origin server for this occurrence of the problem.'
+        title:
+          type: string
+          description: 'A short, human-readable summary of the problem type.  It SHOULD NOT change from occurrence to occurrence of the problem, except for purposes of localisation.'
+        detail:
+          type: string
+          description: An human readable explanation specific to this occurrence of the problem.
+        type:
+          type: string
+          description: 'An absolute URI that identifies the problem type. When dereferenced, it SHOULD provide human-readable documentation for the problem type. When this member is not present, its value is assumed to be "about:blank".'
+        instance:
+          type: string
+          description: An absolute URI that identifies the specific occurrence of the problem.  It may or may not yield further information if dereferenced.
