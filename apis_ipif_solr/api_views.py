@@ -5,8 +5,9 @@ from pysolaar import Q
 from pysolaar.pysolaar import PySolaar
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import NotFound
 
-from apis_ipif_solr.indexes import PersonIndex, StatementIndex
+from apis_ipif_solr.indexes import FactoidIndex, PersonIndex, StatementIndex
 
 
 DEFAULT_PAGE_SIZE = 30
@@ -108,6 +109,17 @@ def apply_statement_params(queryset, params, statements_parent_key="ST"):
     return queryset
 
 
+def wrap_result_with_protocol(result, params):
+    return {
+        "protocol": {
+            "size": len(result),
+            "totalHits": result.count(),
+            "page": int(params.get("page", DEFAULT_PAGE_NUMBER)),
+        },
+        "persons": result,
+    }
+
+
 class PersonListView(APIView):
     def get(self, request, format=None):
         """
@@ -133,7 +145,7 @@ class PersonListView(APIView):
 
         """
 
-        params = request.GET
+        params = request.query_params
 
         person_result = PersonIndex
 
@@ -190,13 +202,97 @@ class PersonListView(APIView):
                 field_name="S",
             )
 
-        result = {
-            "protocol": {
-                "size": len(person_result),
-                "totalHits": person_result.count(),
-                "page": int(params.get("page", DEFAULT_PAGE_NUMBER)),
-            },
-            "persons": person_result,
-        }
+        import datetime
+
+        start = datetime.datetime.now()
+        result = wrap_result_with_protocol(person_result, params)
+        print("QUERYTIME", datetime.datetime.now() - start)
 
         return Response(result)
+
+
+class PersonsView(APIView):
+    def get(self, request, format=None, id=None):
+
+        person_result = PersonIndex.filter(Q(id=id) | Q(uris=id))
+
+        if person_result.first():
+            return Response(person_result.first())
+
+        return Response({"description": "the person does not exist"}, status=404)
+
+
+class FactoidsListView(APIView):
+    def get(self, request, format=None):
+        params = request.query_params
+
+        factoid_result = FactoidIndex
+        factoid_result = apply_page_number_and_size_params(factoid_result, params)
+        factoid_result = apply_statement_params(factoid_result, params)
+
+        statementId = params.get("statementId")
+        if statementId:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                field_name="ST", id=statementId
+            )
+
+        st = params.get("st")
+        if st:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                Q(createdBy=st)
+                | Q(modifiedBy=st)
+                | Q(statementType__label=st)
+                | Q(statementType__uri=st),
+                field_name="ST",
+            )
+
+        sourceId = params.get("sourceId")
+        if sourceId:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                field_name="S", id=sourceId
+            )
+
+        s = params.get("s")
+        if s:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                Q(label=s) | Q(uris=s) | Q(createdBy=s) | Q(modifiedBy=s),
+                field_name="S",
+            )
+
+        personId = params.get("personId")
+        if personId:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                field_name="Person", id=personId
+            )
+
+        p = params.get("p")
+        if p:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                Q(label=p) | Q(uris=p) | Q(createdBy=p) | Q(modifiedBy=p),
+                field_name="Person",
+            )
+
+        f = params.get("f")
+        if f:
+            factoid_result = factoid_result.filter_by_distinct_child(
+                Q(createdBy=f) | Q(modifiedBy=f), field_name="F",
+            )
+
+        result = wrap_result_with_protocol(factoid_result, params)
+        return Response(result)
+
+
+class FactoidsView(APIView):
+    def get(self, request, format=None, id=None):
+        factoid = FactoidIndex.filter(id=id)
+        if factoid.first():
+            return Response(factoid.first())
+        return Response({"description": "the factoid does not exist"}, status=404)
+
+
+class StatementsView(APIView):
+    def get(self, request, format=None, id=None):
+        statement = StatementIndex.filter(id=id)
+        if statement.first():
+            return Response(statement.first())
+        return Response({"description": "the statement does not exist"})

@@ -44,16 +44,25 @@ class FactoidIndex(PySolaar):
             modifiedBy=True,
             modifiedWhen=True,
             personId=True,
-            ST=SplattedChildDocument(
+            ST=ChildDocument(  # TODO: NEED ALL THE FIELDS HERE IN ORDER TO SEARCH!!!
                 id=True,
+                createdBy=True,
+                modifiedBy=True,
+                statementType=True,
                 name=True,
-                memberOf=True,
-                place=True,
-                relatesToPerson=True,
                 role=True,
+                date=True,
+                places=True,
+                relatesToPersons=SplattedChildDocument(id=True, uris=True,),
+                memberOf=True,
                 statementText=True,
             ),
-            Person=ChildDocument(id=True, uris=True,),
+            S=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+            ),
+            Person=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True
+            ),
             Statements=ChildDocument(
                 id=True,
                 statementText=True,
@@ -80,10 +89,11 @@ class FactoidIndex(PySolaar):
             Statements=(
                 ChildDocument(id=TransformKey("@id"),)
                 & TransformKey("statement-refs")
-                & TransformValues(
-                    lambda v: {"description": STATEMENT_REF_DESCRIPTION, **v}
-                )
+                # & TransformValues(
+                #    lambda v: {"description": STATEMENT_REF_DESCRIPTION, **v}
+                # )
             ),
+            S=(ChildDocument(id=TransformKey("@id")) & TransformKey("source-ref")),
         )
 
     def build_document_set(self):
@@ -433,6 +443,7 @@ class StatementIndex(PySolaar):
             memberOf__label=SingleValue,
             memberOf__uri=True,
             statementText=SingleValue,
+            places=True,
             relatesToPersons=ChildDocument(uris=True, label=SingleValue,),
             createdBy=SingleValue,
             createdWhen=SingleValue,
