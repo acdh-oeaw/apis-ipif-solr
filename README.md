@@ -1,7 +1,7 @@
 APIS IPIF (Solr implementation)
 ===============================
 
-Repository for implementation of IPIF API for APIS, using Solr indexes for data storage and querying.
+Repository for implementation of [IPIF Prosopography API](https://github.com/GVogeler/prosopogrAPhI) for APIS, using Solr indexes for data storage and querying.
 
 ## Installation
 
@@ -26,3 +26,7 @@ INSTALLED_APPS = [
 if "apis_ipif_solr" in settings.INSTALLED_APPS:
     urlpatterns.append(url(r"^ipif/", include("apis_ipif_solr.urls", namespace="ipif")))
 ```
+
+To create an IPIF Solr index, run `python manage.py runscript build_indexes`.
+
+IPIF endpoint is served from `<APIS-INSTANCE>/ipif/`.
