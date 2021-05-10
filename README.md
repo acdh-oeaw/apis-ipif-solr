@@ -39,3 +39,9 @@ IPIF endpoint is served from `<APIS-INSTANCE>/ipif/`.
 - `sortBy` parameter is not currently implemented. Due to complex nesting of documents, it may be
 necessary to do this in Python (which is painful).
 - Open-API-style documentation not yet implemented. Using the standard DRF styling for now.
+
+
+## Requirements
+
+- This uses a custom Solr library ([PySolaar](https://gitlab.com/richardhadden/pysolaar)). Please contact richard.hadden@oeaw.ac.at
+if there are any problems with this.
