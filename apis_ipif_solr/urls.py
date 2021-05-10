@@ -5,6 +5,7 @@ from .api_views import (
     FactoidsView,
     PersonsListView,
     PersonsView,
+    SourcesView,
     SourcesListView,
     StatementsListView,
     StatementsView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path("statements/", StatementsListView.as_view()),
     re_path(r"statements/(?P<id>(https?://)?.*)$", StatementsView.as_view()),
     path("sources/", SourcesListView.as_view()),
+    re_path(r"sources/(?P<id>(https?://)?.*)$", SourcesView.as_view()),
 ]

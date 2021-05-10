@@ -426,3 +426,11 @@ class SourcesListView(APIView):
         source_result = apply_page_number_and_size_params(source_result, params)
         result = wrap_result_with_protocol(source_result, params, "sources")
         return Response(result)
+
+
+class SourcesView(APIView):
+    def get(self, request, id, format=None):
+        source = SourceIndex.filter(id=id)
+        if source.first():
+            return Response(source.first())
+        return Response({"description": "the statement does not exist"})
