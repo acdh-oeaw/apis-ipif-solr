@@ -28,7 +28,7 @@ from apis_bibsonomy.models import Reference
 import zlib
 
 
-PySolaar.configure_pysolr("http://localhost:8983/solr/test_solr", always_commit=True)
+PySolaar.configure_pysolr(settings.APIS_IPIF_CONFIG.get("URL"), always_commit=True)
 
 
 STATEMENT_REF_DESCRIPTION = (
@@ -779,26 +779,3 @@ class StatementIndex(PySolaar):
 
         # yield from (StatementIndex.Document(**item) for item in r_list)
 
-
-def run():
-    # p = Person.objects.first()
-    # d = FactoidIndex.build_document((p, None)).doc_to_solr()
-    # print(len(d["_doc"]))
-
-    import time
-
-    start_time = time.time()
-    PySolaar.update(max_chunk_size=2000)
-
-    print(PersonIndex.first())
-    print(time.time() - start_time)
-
-    """
-    d = SourceIndex.build_document(
-        (
-            Person.objects.filter(pk=29839).first(),
-            Reference.objects.filter(object_id=29839).first(),
-        )
-    ).doc_to_solr()
-    print(d)
-    """
