@@ -5,6 +5,9 @@ Repository for implementation of [IPIF Prosopography API](https://github.com/GVo
 
 ## Installation
 
+Install with pip (or other package manager):
+`pip install git@gitlab.com:acdh-oeaw/apis/apis-ipif-solr.git`
+
 ```python
 # Your settings file:
 
