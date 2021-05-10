@@ -33,3 +33,8 @@ if "apis_ipif_solr" in settings.INSTALLED_APPS:
 To create an IPIF Solr index, run `python manage.py runscript build_indexes`.
 
 IPIF endpoint is served from `<APIS-INSTANCE>/ipif/`.
+
+## Limitations
+
+- `sortBy` parameter is not currently implemented. Due to complex nesting of documents, it may be
+necessary to do this in Python (which is painful).
