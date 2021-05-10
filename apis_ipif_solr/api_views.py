@@ -1,13 +1,18 @@
+import datetime
 from functools import reduce
-import json
 
-from pysolaar import Q
-from pysolaar.pysolaar import PySolaar
+from dateutil.parser import parse
+from pysolaar import Q, PySolaar
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound
 
-from apis_ipif_solr.indexes import FactoidIndex, PersonIndex, StatementIndex
+from apis_ipif_solr.indexes import (
+    FactoidIndex,
+    PersonIndex,
+    SourceIndex,
+    StatementIndex,
+)
 
 
 DEFAULT_PAGE_SIZE = 30
@@ -36,6 +41,51 @@ def apply_page_number_and_size_params(queryset, params):
     return queryset
 
 
+def build_statement_filter_q_list(params):
+    """ Unpacks Statement-related parameters into a list of Q objects
+    depending on parameter type"""
+
+    statement_filter_q_list = []
+    for statement_param_key in STATEMENT_PARAM_KEYS:
+        statement_param_value = params.get(statement_param_key)
+        if statement_param_value:
+            if statement_param_key == "to":
+                statement_filter_q_list.append(
+                    Q(
+                        # date__sortdate_dt="[* TO *]",
+                        date__sortdate_dt__lte=parse(
+                            statement_param_value,
+                            default=datetime.datetime(2022, 12, 31),
+                        ),
+                    )
+                )
+            elif statement_param_key == "from":
+                statement_filter_q_list.append(
+                    Q(
+                        # date__sortdate_dt="[* TO *]",
+                        date__sortdate_dt__gte=parse(
+                            statement_param_value, default=datetime.datetime(1000, 1, 1)
+                        ),
+                    )
+                )
+            elif statement_param_key == "place":
+                # Fields are called "places" but API wants "place"
+                q = Q(places__uris=statement_param_value) | Q(
+                    places__label=statement_param_value
+                )
+                statement_filter_q_list.append(q)
+            elif statement_param_key in ("statementText", "name", "relatesToPersons"):
+                q = Q(**{statement_param_key: statement_param_value})
+                statement_filter_q_list.append(q)
+            else:
+                q = Q(**{f"{statement_param_key}__uri": statement_param_value}) | Q(
+                    **{f"{statement_param_key}__label": statement_param_value}
+                )
+                statement_filter_q_list.append(q)
+
+    return statement_filter_q_list
+
+
 def apply_statement_params(queryset, params, statements_parent_key="ST"):
     """ Apply statement-specific filters to a given queryset.
     
@@ -47,7 +97,7 @@ def apply_statement_params(queryset, params, statements_parent_key="ST"):
     ✅ statementType 
     ✅ statementText     person has statement matching StatementText
     ✅ relatesToPerson   person has statement with relatesToPerson URL or Label
-    - memberOf          person has statement with memberOf URL or Label
+    ✅ memberOf          person has statement with memberOf URL or Label
     ✅ role              person has statement with role URL or Label
     ✅ name              person has statement naming the person (string)
     ✅ from              person has statement not before From date
@@ -55,26 +105,7 @@ def apply_statement_params(queryset, params, statements_parent_key="ST"):
     ✅ place             person has statement with place URL or Label
     """
 
-    statement_filter_q_list = []
-    for statement_param_key in STATEMENT_PARAM_KEYS:
-        statement_param_value = params.get(statement_param_key)
-        if statement_param_value:
-            if statement_param_key == "to":
-                statement_filter_q_list.append(
-                    Q(date__sortdate__lte=statement_param_value)
-                )
-            elif statement_param_key == "from":
-                statement_filter_q_list.append(
-                    Q(date__sortdate__gte=statement_param_value)
-                )
-            elif statement_param_key in ("statementText", "name", "relatesToPersons"):
-                q = Q(**{statement_param_key: statement_param_value})
-                statement_filter_q_list.append(q)
-            else:
-                q = Q(**{f"{statement_param_key}__uri": statement_param_value}) | Q(
-                    **{f"{statement_param_key}__label": statement_param_value}
-                )
-                statement_filter_q_list.append(q)
+    statement_filter_q_list = build_statement_filter_q_list(params)
 
     if statement_filter_q_list:
         #######
@@ -109,18 +140,18 @@ def apply_statement_params(queryset, params, statements_parent_key="ST"):
     return queryset
 
 
-def wrap_result_with_protocol(result, params):
+def wrap_result_with_protocol(result, params, ipif_type):
     return {
         "protocol": {
             "size": len(result),
             "totalHits": result.count(),
             "page": int(params.get("page", DEFAULT_PAGE_NUMBER)),
         },
-        "persons": result,
+        ipif_type: result,
     }
 
 
-class PersonListView(APIView):
+class PersonsListView(APIView):
     def get(self, request, format=None):
         """
         Get list of persons from index.
@@ -204,9 +235,7 @@ class PersonListView(APIView):
 
         import datetime
 
-        start = datetime.datetime.now()
-        result = wrap_result_with_protocol(person_result, params)
-        print("QUERYTIME", datetime.datetime.now() - start)
+        result = wrap_result_with_protocol(person_result, params, "persons")
 
         return Response(result)
 
@@ -228,7 +257,9 @@ class FactoidsListView(APIView):
 
         factoid_result = FactoidIndex
         factoid_result = apply_page_number_and_size_params(factoid_result, params)
-        factoid_result = apply_statement_params(factoid_result, params)
+        factoid_result = apply_statement_params(
+            factoid_result, params, statements_parent_key="Statements"
+        )
 
         statementId = params.get("statementId")
         if statementId:
@@ -278,7 +309,7 @@ class FactoidsListView(APIView):
                 Q(createdBy=f) | Q(modifiedBy=f), field_name="F",
             )
 
-        result = wrap_result_with_protocol(factoid_result, params)
+        result = wrap_result_with_protocol(factoid_result, params, "factoids")
         return Response(result)
 
 
@@ -290,9 +321,108 @@ class FactoidsView(APIView):
         return Response({"description": "the factoid does not exist"}, status=404)
 
 
+class StatementsListView(APIView):
+    def get(self, request, format=None):
+        params = request.query_params
+
+        statement_result = StatementIndex
+
+        sourceId = params.get("sourceId")
+        if sourceId:
+            statement_result = statement_result.filter_by_distinct_child(
+                field_name="S", id=sourceId
+            )
+
+        s = params.get("s")
+        if s:
+            statement_result = statement_result.filter_by_distinct_child(
+                Q(label=s) | Q(uris=s) | Q(createdBy=s) | Q(modifiedBy=s),
+                field_name="S",
+            )
+
+        personId = params.get("personId")
+        if personId:
+            statement_result = statement_result.filter_by_distinct_child(
+                field_name="P", id=personId
+            )
+
+        p = params.get("p")
+        if p:
+            statement_result = statement_result.filter_by_distinct_child(
+                Q(label=p) | Q(uris=p) | Q(createdBy=p) | Q(modifiedBy=p),
+                field_name="P",
+            )
+
+        factoidId = params.get("factoidId")
+        if factoidId:
+            statement_result = statement_result.filter_by_distinct_child(
+                field_name="F", id=factoidId
+            )
+
+        f = params.get("f")
+        if f:
+            statement_result = statement_result.filter_by_distinct_child(
+                Q(createdBy=f) | Q(modifiedBy=f), field_name="F",
+            )
+
+        statement_filter_q_list = build_statement_filter_q_list(params)
+        if statement_filter_q_list:
+            statement_filter_q_object = statement_filter_q_list[0]
+            for q in statement_filter_q_list[1:]:
+                statement_filter_q_object &= q
+
+            statement_result = statement_result.filter(statement_filter_q_object)
+        statement_result = apply_page_number_and_size_params(statement_result, params)
+        result = wrap_result_with_protocol(statement_result, params, "statements")
+        return Response(result)
+
+
 class StatementsView(APIView):
     def get(self, request, format=None, id=None):
         statement = StatementIndex.filter(id=id)
         if statement.first():
             return Response(statement.first())
         return Response({"description": "the statement does not exist"})
+
+
+class SourcesListView(APIView):
+    def get(self, request, format=None):
+        params = request.query_params
+
+        source_result = SourceIndex
+
+        s = params.get("s")
+        if s:
+            source_result = source_result.filter(
+                Q(label=s) | Q(uris=s) | Q(createdBy=s) | Q(modifiedBy=s),
+            )
+
+        personId = params.get("personId")
+        if personId:
+            source_result = source_result.filter_by_distinct_child(
+                field_name="P", id=personId
+            )
+
+        p = params.get("p")
+        if p:
+            source_result = source_result.filter_by_distinct_child(
+                Q(label=p) | Q(uris=p) | Q(createdBy=p) | Q(modifiedBy=p),
+                field_name="P",
+            )
+
+        factoidId = params.get("factoidId")
+        if factoidId:
+            source_result = source_result.filter_by_distinct_child(
+                field_name="Factoids", id=factoidId
+            )
+
+        f = params.get("f")
+        if f:
+            source_result = source_result.filter_by_distinct_child(
+                Q(createdBy=f) | Q(modifiedBy=f), field_name="Factoids",
+            )
+
+        source_result = apply_statement_params(source_result, params)
+        source_result = apply_page_number_and_size_params(source_result, params)
+        result = wrap_result_with_protocol(source_result, params, "sources")
+        return Response(result)

@@ -7,6 +7,7 @@ authors = ["Richard Hadden <richard.hadden@oeaw.ac.at>"]
 [tool.poetry.dependencies]
 python = ">=3.6,<4"
 pysolaar = {git = "git@gitlab.com:richardhadden/pysolaar.git", rev = "main"}
+python-dateutil = ""
 
 
 [tool.poetry.dev-dependencies]

@@ -2,6 +2,7 @@ from pysolaar import (
     PySolaar,
     SingleValue,
     DocumentFields,
+    Transform,
     TransformKey,
     TransformValues,
     JsonToDict,
@@ -13,6 +14,7 @@ from pysolaar.document import (
     SplattedChildDocument,
 )
 import copy
+import datetime
 import hashlib
 import re
 import json
@@ -44,7 +46,14 @@ class FactoidIndex(PySolaar):
             modifiedBy=True,
             modifiedWhen=True,
             personId=True,
-            ST=ChildDocument(  # TODO: NEED ALL THE FIELDS HERE IN ORDER TO SEARCH!!!
+            ST=ChildDocument(id=True, createdBy=True, modifiedBy=True,),
+            S=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+            ),
+            Person=ChildDocument(
+                id=True, uris=True, label=True, createdBy=True, modifiedBy=True
+            ),
+            Statements=ChildDocument(
                 id=True,
                 createdBy=True,
                 modifiedBy=True,
@@ -56,22 +65,6 @@ class FactoidIndex(PySolaar):
                 relatesToPersons=SplattedChildDocument(id=True, uris=True,),
                 memberOf=True,
                 statementText=True,
-            ),
-            S=ChildDocument(
-                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
-            ),
-            Person=ChildDocument(
-                id=True, uris=True, label=True, createdBy=True, modifiedBy=True
-            ),
-            Statements=ChildDocument(
-                id=True,
-                statementText=True,
-                relatesToPerson=True,
-                memberOf=True,
-                role=True,
-                name=True,
-                date=True,
-                place=True,
             ),
         )
 
@@ -162,7 +155,17 @@ class FactoidIndex(PySolaar):
         res["Statements"] = StatementIndex.items([(person, source)])
         res["Person"] = PersonIndex.items([person])
 
-        return FactoidIndex.Document(id=f"factoid_{person.pk}", **res)
+        if source is None:
+            if person.source_id:
+                source_id = f"original_source_{person.source_id}"
+
+            else:
+                source_id = f"original_source_for_{person.pk}"
+
+        else:
+            source_id = f"reference_{person.pk}_{hashlib.md5(str(source.bibs_url).encode('utf-8')).hexdigest()}"
+
+        return FactoidIndex.Document(id=f"factoid__{person.pk}__{source_id}", **res)
 
 
 class PersonIndex(PySolaar):
@@ -210,13 +213,23 @@ class PersonIndex(PySolaar):
             uris=True,
             F=ChildDocument(
                 id=TransformKey("@id"),
-                Person=JsonToDict(id=TransformKey("@id"),)
-                & SingleValue
-                & TransformKey("person-ref"),
-                ST=JsonToDict(id=TransformKey("@id"),) & TransformKey("statement-refs"),
-                S=JsonToDict(id=TransformKey("@id"),)
-                & SingleValue
-                & TransformKey("source-ref"),
+                Person=(
+                    JsonToDict(
+                        id=Transform(
+                            lambda k, v: ("@id", str(v))
+                        )  # Person ids are treated as ints by Solr; we want strings
+                    )
+                    & SingleValue
+                    & TransformKey("person-ref")
+                ),
+                ST=(
+                    JsonToDict(id=TransformKey("@id"),) & TransformKey("statement-refs")
+                ),
+                S=(
+                    JsonToDict(id=TransformKey("@id"),)
+                    & SingleValue
+                    & TransformKey("source-ref")
+                ),
             )
             & TransformKey("factoid-refs"),
         )
@@ -230,7 +243,7 @@ class PersonIndex(PySolaar):
     # build_document_set = None
 
     def build_document(self, instance):
-        doc = {"id": instance.pk}
+        doc = {"id": str(instance.pk)}
         doc["label"] = f"{instance.name}, {instance.first_name} ({instance.pk})"
         ver = Version.objects.get_for_object(instance).order_by(
             "revision__date_created"
@@ -276,35 +289,27 @@ class SourceIndex(PySolaar):
             modifiedWhen=True,
             label=True,
             uris=True,
-            st=SplattedChildDocument(
+            ST=ChildDocument(  # TODO: NEED ALL THE FIELDS HERE IN ORDER TO SEARCH!!!
                 id=True,
+                createdBy=True,
+                modifiedBy=True,
+                statementType=True,
                 name=True,
-                memberOf=True,
-                place=True,
-                relatesToPerson=True,
                 role=True,
+                date=True,
+                places=True,
+                relatesToPersons=SplattedChildDocument(id=True, uris=True,),
+                memberOf=True,
                 statementText=True,
             ),
-            F=SplattedChildDocument(
-                createdBy=True, modifiedBy=True, modfiedWhen=True, createdWhen=True,
-            ),
+            P=ChildDocument(id=True, uris=True, createdBy=True, modifiedBy=True),
             Factoids=ChildDocument(
                 id=True,
-                Person=SplattedChildDocument(id=True,),
-                Source=SplattedChildDocument(id=True,),
-                Statements=SplattedChildDocument(id=True),
-            ),
-            P=SplattedChildDocument(uris=True, createdBy=True, modifiedBy=True,),
-            Persons=ChildDocument(id=True,),
-            Statements=ChildDocument(
-                id=True,
-                statementText=True,
-                relatesToPerson=True,
-                memberOf=True,
-                role=True,
-                name=True,
-                date=True,
-                place=True,
+                createdBy=True,
+                modifiedBy=True,
+                Person=JsonChildDocument(id=True,),
+                S=JsonChildDocument(id=True,),
+                ST=JsonChildDocument(id=True),
             ),
         )
         return_document_fields = DocumentFields(
@@ -315,8 +320,22 @@ class SourceIndex(PySolaar):
             createdWhen=SingleValue,
             modfiedBy=SingleValue,
             modifiedWhen=SingleValue,
-            Factoids=ChildDocument(Person=TransformKey("person-ref") & SingleValue,)
-            & SingleValue
+            Factoids=ChildDocument(
+                id=TransformKey("@id"),
+                Person=(
+                    JsonToDict(id=Transform(lambda k, v: ("@id", str(v))))
+                    & TransformKey("person-ref")
+                    & SingleValue
+                ),
+                S=(
+                    JsonToDict(id=TransformKey("@id"))
+                    & TransformKey("source-ref")
+                    & SingleValue
+                ),
+                ST=(
+                    JsonToDict(id=TransformKey("@id")) & TransformKey("statement-refs")
+                ),
+            )
             & TransformKey("factoid-refs"),
         )
 
@@ -345,10 +364,12 @@ class SourceIndex(PySolaar):
         if source is None:
             if person.source_id:
                 doc["id"] = f"original_source_{person.source_id}"
+                doc["label"] = f"Original source  {person.source_id}"
             else:
                 doc["id"] = f"original_source_for_{person.pk}"
+                doc["label"] = f"Original source for {str(person.source)}"
 
-            doc["label"] = str(person.source)  # TODO: this is a rubbish label!
+            # TODO: this is a rubbish label!
             doc["uris"] = [
                 reverse("apis:apis_api:source-detail", kwargs={"pk": person.source_id})
             ]
@@ -369,11 +390,11 @@ class SourceIndex(PySolaar):
         if source is None:
             # If Source is None, get the Person-NoneSource combo -- by definition only one item
             doc["Factoids"] = FactoidIndex.items([(person, source)])
-            doc["f"] = FactoidIndex.items([(person, source)])
+            doc["F"] = FactoidIndex.items([(person, source)])
             doc["Persons"] = PersonIndex.items(person)
-            doc["p"] = PersonIndex.items(person)
+            doc["P"] = PersonIndex.items(person)
             doc["Statements"] = StatementIndex.items([(person, source)])
-            doc["st"] = StatementIndex.items([(person, source)])
+            doc["ST"] = StatementIndex.items([(person, source)])
         else:
             # Otherwise, there can be more than one Factoid related to this source (i.e. same source
             # but more than one person, so iterate persons if they are connected to this reference)
@@ -386,17 +407,17 @@ class SourceIndex(PySolaar):
             doc["Factoids"] = FactoidIndex.items(
                 [(p, source) for p in persons_associated_with_source]
             )
-            doc["f"] = FactoidIndex.items(
+            doc["F"] = FactoidIndex.items(
                 [(p, source) for p in persons_associated_with_source]
             )
 
             doc["Persons"] = PersonIndex.items(persons_associated_with_source)
-            doc["p"] = PersonIndex.items(persons_associated_with_source)
+            doc["P"] = PersonIndex.items(persons_associated_with_source)
             doc["Statements"] = StatementIndex.items(
                 [(p, source) for p in persons_associated_with_source]
             )
 
-            doc["st"] = StatementIndex.items(
+            doc["ST"] = StatementIndex.items(
                 [(p, source) for p in persons_associated_with_source]
             )
 
@@ -424,7 +445,14 @@ class StatementIndex(PySolaar):
                 id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
             ),
             F=ChildDocument(
-                id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
+                id=True,
+                uris=True,
+                label=True,
+                createdBy=True,
+                modifiedBy=True,
+                Person=JsonChildDocument(id=True),
+                S=JsonChildDocument(id=True),
+                ST=JsonChildDocument(id=True),
             ),
             S=ChildDocument(
                 id=True, uris=True, label=True, createdBy=True, modifiedBy=True,
@@ -438,17 +466,40 @@ class StatementIndex(PySolaar):
             name=True,
             role__label=SingleValue,
             role__uri=True,
-            date__sortdate=True,
+            date__sortdate_dt=TransformKey("sortdate"),
             date__label=True,
             memberOf__label=SingleValue,
             memberOf__uri=True,
             statementText=SingleValue,
-            places=True,
+            places__uris=True,
+            places__label=SingleValue,
+            places=Transform(
+                lambda k, v: (k, [v])
+            ),  # Makes the places into a list, as required
             relatesToPersons=ChildDocument(uris=True, label=SingleValue,),
             createdBy=SingleValue,
             createdWhen=SingleValue,
             modifiedBy=SingleValue,
             modifiedWhen=SingleValue,
+            F=ChildDocument(
+                id=TransformKey("@id"),
+                Person=(
+                    JsonToDict(id=TransformKey("@id"))
+                    & TransformKey("person-ref")
+                    & SingleValue
+                ),
+                S=(
+                    JsonToDict(id=TransformKey("@id"))
+                    & TransformKey("source-ref")
+                    & SingleValue
+                ),
+                ST=(
+                    JsonToDict(id=TransformKey("@id"))
+                    & TransformValues(lambda v: {"@id": v["@id"]})
+                )
+                & TransformKey("statement-refs"),
+            )
+            & TransformKey("factoid-refs"),
         )
 
     def build_document_set(self):
@@ -467,13 +518,13 @@ class StatementIndex(PySolaar):
     def _build_document_template(id_string, instance, source):
         item = {"id": id_string}
 
-        item["name"] = " "
+        item["name"] = None
         item["statementType"] = {"uri": None, "label": None}
         item["memberOf"] = {"uri": None, "label": None}
-        item["place"] = {"uri": None, "label": None}
+        item["places"] = {"uris": None, "label": None}
         item["relatesToPersons"] = PersonIndex.items([])
         item["role"] = {"uri": None, "label": None}
-        item["date"] = {"sortdate": None, "label": None}
+        item["date"] = {"sortdate_dt": None, "label": None}
         item["P"] = PersonIndex.items([instance])
         item["F"] = FactoidIndex.items([(instance, source)])
         item["S"] = SourceIndex.items([(instance, source)])
@@ -531,7 +582,12 @@ class StatementIndex(PySolaar):
                     getattr(relation.relation_type, "reverse_name", None)
                     or relation.relation_type.name
                 )
-                item["date"]["sortdate"] = relation.start_date or relation.end_date
+                item["date"]["sortdate_dt"] = (
+                    relation.start_date
+                    or relation.end_date
+                    or item["date"]["sortdate_dt"]
+                )
+
                 item["date"]["label"] = (
                     f"{relation.start_date}-{relation.end_date}"
                     if relation.start_date and relation.end_date
@@ -545,10 +601,10 @@ class StatementIndex(PySolaar):
                     item["memberOf"]["label"] = relation.related_institution.name
 
                 if relation_type_name == "PersonPlace":
-                    item["place"]["uri"] = [
+                    item["places"]["uris"] = [
                         str(url) for url in relation.related_place.uri_set.all()
                     ] + [relation.related_place.get_absolute_url()]
-                    item["place"]["label"] = relation.related_place.name
+                    item["places"]["label"] = relation.related_place.name
 
                 item["statementText"] = str(relation)
 
@@ -615,7 +671,11 @@ class StatementIndex(PySolaar):
                     if A_or_B == "A"
                     else relation.relation_type.name_reverse
                 )
-                item["date"]["sortdate"] = relation.start_date or relation.end_date
+                item["date"]["sortdate_dt"] = (
+                    relation.start_date
+                    or relation.end_date
+                    or item["date"]["sortdate_dt"]
+                )
                 item["date"]["label"] = (
                     f"{relation.start_date}-{relation.end_date}"
                     if relation.start_date and relation.end_date
@@ -677,12 +737,16 @@ class StatementIndex(PySolaar):
                 if f.name == "start_date":
                     item["statementType"]["uri"] = "statement_type_uri"
                     item["role"]["label"] = "birth"
-                    item["date"]["sortdate"] = f.value_from_object(instance)
+                    item["date"]["sortdate_dt"] = (
+                        f.value_from_object(instance) or item["date"]["sortdate_dt"]
+                    )
 
                 if f.name == "end_date":
                     item["statementType"]["uri"] = "statement_type_uri"
                     item["role"]["label"] = "death"
-                    item["date"]["sortdate"] = f.value_from_object(instance)
+                    item["date"]["sortdate_dt"] = (
+                        f.value_from_object(instance) or item["date"]["sortdate_dt"]
+                    )
 
                 if item["role"]["label"]:
                     yield StatementIndex.Document(**item)
