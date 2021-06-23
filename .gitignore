@@ -110,4 +110,7 @@ media/
 *.db
 *.pid
 
+/.vscode
+
+
 .vscode/
