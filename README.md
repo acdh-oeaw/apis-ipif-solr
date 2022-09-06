@@ -1,3 +1,5 @@
+#### (not deployable, and works only with most vanilla APIS! -- see IPIF-HUB for longer term approach)
+
 APIS IPIF (Solr implementation)
 ===============================
 
